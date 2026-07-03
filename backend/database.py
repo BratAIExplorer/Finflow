@@ -3,9 +3,15 @@ from sqlalchemy.orm import sessionmaker
 import os
 from .models import Base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://finflow_user:finflow_password@db:5432/finflow_db")
-
-engine = create_engine(DATABASE_URL)
+# Use PostgreSQL if DATABASE_URL is set, otherwise use SQLite for local development
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    # Local development: use SQLite (no setup required)
+    DATABASE_URL = "sqlite:///./finflow_dev.db"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    # Production: use PostgreSQL
+    engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
