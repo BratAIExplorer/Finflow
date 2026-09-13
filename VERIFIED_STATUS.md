@@ -1,3 +1,5 @@
+> **This is a point-in-time local-dev verification log (Jul–Sep 2026).** For the current live deployment (VPS, HTTPS URL, security audit), see [CURRENT_STATUS.md](CURRENT_STATUS.md) instead — it's live now, "Deploy: when ready" below is done.
+
 # FinFlow — Verified Status (2026-07-03, holdings dashboard 2026-09-10)
 
 ## ✅ Verified 2026-09-10 — Holdings dashboard + login (mock data)

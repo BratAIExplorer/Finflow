@@ -2,12 +2,14 @@
 
 A premium financial dashboard for families to track assets, manage insurance, and coordinate lending.
 
+**🌐 Live**: `https://finflow.fortressintelligence.space` — deployed, HTTPS, security-audited. See [CURRENT_STATUS.md](CURRENT_STATUS.md) for full deployment notes.
+
 **Live Features:**
-- 🔐 Authentication (register, login, JWT tokens)
+- 🔐 Authentication (register, login, JWT tokens, server-side password strength + login lockout)
 - 💰 Asset tracking (add/view family assets)
 - 👨‍👩‍👧 Family management (invitations, shared access)
-- 📊 Premium glassmorphism dashboard UI (Next.js 19 + Tailwind)
-- 📈 Broker holdings dashboard — mStock + Zerodha (2 accounts) connectors, read-only, with RSI/MACD/52-week-range signals from a free public price feed (backend code + offline tests done; not yet wired into the frontend UI — see `backend/routers/holdings.py`)
+- 📊 Premium glassmorphism dashboard UI (Next.js 19 + Tailwind), redesigned for senior-citizen readability (full-screen, large fonts, high contrast)
+- 📈 Broker holdings dashboard — mStock + Zerodha (2 accounts) connectors, read-only, with RSI/MACD/52-week-range signals from a free public price feed, cash balance KPI, wired into the frontend `Portfolio` modal (Summary + Holdings tabs)
 
 **In Development:**
 - Broker holdings dashboard — frontend screen (backend is ready, see above)
