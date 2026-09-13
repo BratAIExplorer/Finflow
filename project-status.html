@@ -38,8 +38,8 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-10 15:23 UTC &middot; branch <code>main</code> &middot;
-commit <code>c3c8cd5</code> &middot; feat: support SQLite for local development (zero setup required)</div>
+<div class="meta">Generated 2026-09-13 14:27 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
+commit <code>5925a4c</code> &middot; feat: senior-friendly UI redesign, mStock sync fixes, and startup script</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 10, 2026)</h1>
 <h2>✅ Completed</h2>
@@ -56,19 +56,19 @@ commit <code>c3c8cd5</code> &middot; feat: support SQLite for local development 
 <li><strong>Company enrichment (NEW)</strong>: each sync now also pulls company name, sector and market-cap tier from Yahoo (best-effort — nulls tolerated). New <code>company_name</code> / <code>sector</code> / <code>cap_tier</code> columns on <code>Holding</code>.</li>
 <li><strong>Login screen (NEW)</strong>: glass modal ported from <code>C:\Antigravity\Fortress</code>, adapted to FinFlow&#x27;s FastAPI JWT (token in <code>localStorage</code>). Sign in / create account, wired to <code>/auth/register</code> + <code>/auth/login</code>. <code>Sign in</code> / <code>Sign out</code> in the nav; protected views prompt login.</li>
 <li><strong><code>.env</code> loading (fix)</strong>: <code>backend/main.py</code> now calls <code>load_dotenv()</code> on startup — the app previously never read <code>.env</code>, so <code>APP_ENCRYPTION_KEY</code> was invisible to <code>uvicorn</code>.</li>
-<li><strong>Tested end-to-end with mock data (Sep 10)</strong>: 3 accounts (2 Zerodha + 1 mStock = multi-account AND multi-broker), 7 holdings. Login, Summary charts, Holdings table, inline date edit → flag recompute, and the Add-Broker form all verified in-browser. Mock data then cleared.</li>
+<li><strong>mStock Connector verification</strong>: the mStock integration now correctly uses <code>Authorization: Bearer &lt;jwtToken&gt;</code> and <code>X-PrivateKey</code> headers based on Type B Portfolio API requirements.</li>
+<li><strong>Holdings dashboard frontend (UPDATED)</strong>: <code>Portfolio</code> modal updated for senior-citizen accessibility with full-screen width, large font sizes, and high-contrast glassmorphism colors.</li>
 </ul>
 <h2>🏗️ In Progress</h2>
 <ul>
 <li><strong>UI Design</strong>: premium &quot;Glassmorphism&quot; design system rollout.</li>
 <li><strong>Manual Forms</strong>: Asset entry forms for Insurance and Loans.</li>
-<li><strong>Broker holdings — going live</strong>: still no real broker credentials used. First live mStock sync will likely need small fixes (see the &quot;CONFIRM-BEFORE-LIVE&quot; note in <code>backend/brokers/mstock.py</code>).</li>
 </ul>
 <h2>⏳ Next Up</h2>
-<p>1. Connect dad&#x27;s real mStock account through the <strong>Plugins</strong> modal, run one sync, and confirm the response shape matches <code>brokers/mstock.py</code>&#x27;s assumptions. Repeat for both Zerodha accounts. 2. &quot;Latest company news&quot; section on the holdings screen — needs a news feed + a backend endpoint (not built). 3. Decide storage: local SQLite is fine for now; move to Postgres on the VPS before multi-device or historical tracking (there is no price history table yet — only the latest snapshot per holding). 4. Commit the untracked broker + holdings + login files. 5. <strong>Portfolio Connectors</strong>: read-only API integration for Binance and Luno. 6. <strong>Family Roll-up</strong>: combined net-worth views for family accounts.</p>
+<p>1. <strong>Latest company news</strong>: section on the holdings screen — needs a news feed + a backend endpoint (not built). 2. Decide storage: local SQLite is fine for now; move to Postgres on the VPS before multi-device or historical tracking (there is no price history table yet — only the latest snapshot per holding). 3. Commit the untracked broker + holdings + login files. 4. <strong>Portfolio Connectors</strong>: read-only API integration for Binance and Luno. 5. <strong>Family Roll-up</strong>: combined net-worth views for family accounts.</p>
 <h2>🚧 Blockers</h2>
 <ul>
-<li><strong>mStock/Zerodha credentials</strong>: backend + frontend built and tested with mock data, but nothing has touched a real broker account yet.</li>
+<li><strong>Zerodha credentials</strong>: backend + frontend built and tested with mock data, but nothing has touched a real Zerodha account yet.</li>
 <li><strong>API Keys</strong>: need personal read-only keys for Binance/Luno real-data testing.</li>
 </ul>
 <h2>💡 Ecosystem Note</h2>
