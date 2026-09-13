@@ -62,7 +62,14 @@ export function HoldingsTable({ rows, onReload }: { rows: Holding[]; onReload: (
     );
 }
 
-function Row({ r, onReload }: { r: Holding; onReload: () => void }) {
+function formatOwner(label: string | null) {
+    if (!label) return "—";
+    const name = label.split('@')[0].replace(/[0-9]/g, '');
+    if (name.toLowerCase() === 'kiransamantd' || name.toLowerCase() === 'kiransamant') return 'Kiran';
+    return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+export function Row({ r, onReload }: { r: Holding; onReload: () => void }) {
     const bs = brokerStyle(r.broker);
     const rsi = rsiView(r.rsi_14);
     const macd = macdView(r.macd_hist);
@@ -73,7 +80,7 @@ function Row({ r, onReload }: { r: Holding; onReload: () => void }) {
 
     return (
         <tr className="hover:bg-white/[0.05] transition-colors">
-            <td className={`${td} whitespace-nowrap font-semibold text-gray-300 text-lg`}>{r.account_label ?? "—"}</td>
+            <td className={`${td} whitespace-nowrap font-semibold text-gray-300 text-xl`}>{formatOwner(r.account_label)}</td>
             <td className={td}>
                 <span
                     className="inline-flex items-center gap-2 text-sm font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-sm"

@@ -136,6 +136,16 @@ def sync_account(plugin_id: str, current_user: User = Depends(get_current_user),
 def _run_sync(plugin: UserPlugin, connector, db: Session):
     try:
         raw_holdings = connector.fetch_holdings()
+        
+        # Try fetching cash balance if the broker supports it
+        cash = 0.0
+        if hasattr(connector, 'fetch_funds'):
+            cash = connector.fetch_funds()
+            
+        new_cfg = dict(plugin.config or {})
+        new_cfg["cash_balance"] = cash
+        plugin.config = new_cfg
+        
     except BrokerConnectionError as e:
         plugin.last_sync_error = str(e)
         db.commit()
@@ -197,6 +207,15 @@ def _get_owned_plugin(db: Session, plugin_id: str, current_user: User, expect_br
 
 
 # ---------- reading the dashboard ----------
+
+@router.get("/cash")
+def get_cash_balance(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    plugins = db.query(UserPlugin).filter(UserPlugin.user_id == current_user.id).all()
+    total_cash = 0.0
+    for p in plugins:
+        if p.config and isinstance(p.config, dict):
+            total_cash += float(p.config.get("cash_balance", 0.0))
+    return {"cash_balance": total_cash}
 
 @router.get("/")
 def list_holdings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

@@ -1,4 +1,17 @@
-# FinFlow Current Status (Updated: Sep 10, 2026)
+# FinFlow Current Status (Updated: Sep 13, 2026)
+
+## 🌐 LIVE ON VPS
+Deployed and QA-verified on Hostinger VPS `76.13.179.32` (shared box, also runs Kyro/dealzoda/smartnri — used non-conflicting ports):
+- **App (what Dad opens)**: `http://76.13.179.32:3001`
+- **API** (not for Dad, used by the app itself): `http://76.13.179.32:8001`
+- No domain yet, so **no HTTPS** — login password travels unencrypted over the network. Fine for a first look; get a domain + Caddy/nginx reverse proxy with Let's Encrypt before relying on this day to day, especially since mStock broker credentials pass through it.
+- Secrets (`SECRET_KEY`, `APP_ENCRYPTION_KEY`, DB password) live only in `/opt/FinFlow/.env` on the VPS — not committed to git, not in this repo.
+- Postgres and Redis are container-internal only (no public port) — fixed during this deploy, they were originally exposed to the whole internet with no password.
+
+### Bugs fixed during deployment (would have blocked Dad from ever logging in)
+1. `docker-compose.yml` bind-mounted the frontend source over the built container image, hiding `node_modules`/`.next` — container crash-looped on every restart.
+2. `bcrypt` 4.1+ broke `passlib`'s internal self-test, so `/auth/register` 500'd on every signup. Pinned `bcrypt==4.0.1` in `requirements.txt`.
+3. `NEXT_PUBLIC_API_URL` wasn't passed as a Docker build arg, so the browser bundle would have pointed at `localhost:8000` instead of the real backend.
 
 ## ✅ Completed
 - **Architecture**: Decoupled multi-product architecture finalized.
@@ -33,3 +46,8 @@
 
 ## 💡 Ecosystem Note
 The **ARUN Trading Bot** is now a separate standalone project. FinFlow will eventually integrate with it via a read-only database connection to show "Bot Managed" assets in the total net worth view.
+
+### Recent Updates (Sep 13, 2026)
+- **UI/UX Refinements**: Enlarged fonts across the Summary panel and made the UI more senior-citizen friendly. Simplified owner name displays (e.g. converting emails to first names).
+- **mStock Integration**: Added fetching for Cash Balance from the Type A /fundsummary endpoint and displayed it as a top-level KPI on the Dashboard.
+- **Holdings Improvements**: Corrected purchase date assignment.

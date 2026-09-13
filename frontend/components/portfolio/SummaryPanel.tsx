@@ -30,7 +30,7 @@ import {
 const PIE_COLORS = ["#6366f1", "#22d3ee", "#34d399", "#f59e0b", "#a78bfa", "#f472b6", "#60a5fa", "#4ade80"];
 const CARD = "glass-surface rounded-2xl p-5";
 
-export function SummaryPanel({ rows }: { rows: Holding[] }) {
+export function SummaryPanel({ rows, cash = 0 }: { rows: Holding[], cash?: number }) {
     const [tier, setTier] = useState<string>("All");
 
     // The dashboard opens inside an animating modal; give layout a beat to
@@ -54,29 +54,17 @@ export function SummaryPanel({ rows }: { rows: Holding[] }) {
     const topReturns = topByReturns(filtered);
     const investVsReturns = topInvest.map((d) => ({ name: d.name, Invested: Math.round(d.invested), Returns: Math.round(d.returns) }));
 
-    if (filtered.length === 0) {
-        return <p className="text-sm text-gray-400">No holdings in the {tier} bucket.</p>;
-    }
-
-    const chartFallback = <div className="h-[230px] flex items-center justify-center text-xs text-gray-600">Loading chart…</div>;
+    const chartFallback = <div className="h-[230px] flex items-center justify-center text-base text-gray-600">Loading chart…</div>;
 
     return (
         <div className="flex flex-col gap-5">
-            {/* KPI tiles */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Kpi label="Current Value" value={inr(s.currentValue)} />
-                <Kpi label="Invested Amount" value={inr(s.invested)} />
-                <Kpi label="Total Returns" value={inr(s.pnl)} color={plColor(s.pnl)} />
-                <Kpi label="Growth" value={pctLabel(s.pnlPct)} color={plColor(s.pnl)} />
-            </div>
-
-            {/* Cap-tier filter */}
+            {/* Cap-tier filter always visible */}
             <div className="flex flex-wrap gap-2">
                 {["All", ...CAP_TIERS].map((t) => (
                     <button
                         key={t}
                         onClick={() => setTier(t)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        className={`px-4 py-2 rounded-lg text-lg font-semibold transition-colors ${
                             tier === t ? "bg-indigo-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"
                         }`}
                     >
@@ -85,18 +73,39 @@ export function SummaryPanel({ rows }: { rows: Holding[] }) {
                 ))}
             </div>
 
+            {filtered.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-white/10">
+                    <p className="text-xl text-gray-400 mb-6">No holdings in the {tier} bucket.</p>
+                    <button 
+                        onClick={() => setTier("All")}
+                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors shadow-lg"
+                    >
+                        ← Back to All Holdings
+                    </button>
+                </div>
+            ) : (
+                <>
+                    {/* KPI tiles */}
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                        <Kpi label="Current Value" value={inr(s.currentValue)} />
+                        <Kpi label="Invested Amount" value={inr(s.invested)} />
+                        <Kpi label="Total Returns" value={inr(s.pnl)} color={plColor(s.pnl)} />
+                        <Kpi label="Growth" value={pctLabel(s.pnlPct)} color={plColor(s.pnl)} />
+                        <Kpi label="Cash Balance" value={inr(cash)} color="text-indigo-400" />
+                    </div>
+
             {/* Row: sector pie · cap donut · top 5 invested */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className={CARD}>
-                    <h3 className="text-sm font-bold text-gray-300 mb-2">Investment by Sector</h3>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Investment by Sector</h3>
                     {ready ? <SlicePie data={sectors} innerRadius={0} /> : chartFallback}
                 </div>
                 <div className={CARD}>
-                    <h3 className="text-sm font-bold text-gray-300 mb-2">Investment by Capitalization</h3>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Investment by Capitalization</h3>
                     {ready ? <SlicePie data={caps} innerRadius={55} /> : chartFallback}
                 </div>
                 <div className={CARD}>
-                    <h3 className="text-sm font-bold text-gray-300 mb-2">Top 5 Companies by Investment</h3>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Top 5 Companies by Investment</h3>
                     {ready ? <RankBar data={topInvest.map((d) => ({ name: d.name, value: Math.round(d.invested) }))} color="#6366f1" /> : chartFallback}
                 </div>
             </div>
@@ -104,38 +113,39 @@ export function SummaryPanel({ rows }: { rows: Holding[] }) {
             {/* Row: invested vs returns · top 5 returns */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className={CARD}>
-                    <h3 className="text-sm font-bold text-gray-300 mb-2">Invested vs Returns</h3>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Invested vs Returns</h3>
                     {!ready ? chartFallback : (
                     <ResponsiveContainer width="100%" height={240} minWidth={1} minHeight={1}>
                         <BarChart data={investVsReturns} layout="vertical" margin={{ left: 20, right: 24 }}>
                             <XAxis type="number" hide />
-                            <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#9ca3af", fontSize: 14 }} axisLine={false} tickLine={false} />
                             <Tooltip {...tooltipProps} />
-                            <Bar isAnimationActive={false} dataKey="Invested" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={10} />
-                            <Bar isAnimationActive={false} dataKey="Returns" fill="#34d399" radius={[0, 4, 4, 0]} barSize={10} />
+                            <Bar isAnimationActive={false} dataKey="Invested" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={14} />
+                            <Bar isAnimationActive={false} dataKey="Returns" fill="#34d399" radius={[0, 4, 4, 0]} barSize={14} />
                         </BarChart>
                     </ResponsiveContainer>
                     )}
                 </div>
                 <div className={CARD}>
-                    <h3 className="text-sm font-bold text-gray-300 mb-2">Top 5 Companies by Returns</h3>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Top 5 Companies by Returns</h3>
                     {!ready ? chartFallback : (
                     <ResponsiveContainer width="100%" height={240} minWidth={1} minHeight={1}>
                         <BarChart data={topReturns.map((d) => ({ name: d.name, value: Math.round(d.returns) }))} margin={{ top: 16, left: 4, right: 4 }}>
-                            <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
+                            <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 14 }} axisLine={false} tickLine={false} interval={0} />
                             <YAxis hide />
                             <Tooltip {...tooltipProps} />
-                            <Bar isAnimationActive={false} dataKey="value" radius={[4, 4, 0, 0]} barSize={34}>
+                            <Bar isAnimationActive={false} dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
                                 {topReturns.map((d, i) => (
                                     <Cell key={i} fill={d.returns >= 0 ? "#34d399" : "#fb7185"} />
                                 ))}
-                                <LabelList dataKey="value" position="top" formatter={money} style={{ fill: "#9ca3af", fontSize: 10 }} />
+                                <LabelList dataKey="value" position="top" formatter={money} style={{ fill: "#9ca3af", fontSize: 14 }} />
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                     )}
                 </div>
             </div>
+            </>)}
         </div>
     );
 }
@@ -143,7 +153,7 @@ export function SummaryPanel({ rows }: { rows: Holding[] }) {
 const money = (v: unknown) => inr(Number(v) || 0);
 
 const tooltipProps = {
-    contentStyle: { background: "#0d1220", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12 },
+    contentStyle: { background: "#0d1220", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 16 },
     labelStyle: { color: "#e5e7eb" },
     formatter: money,
 };
@@ -151,8 +161,8 @@ const tooltipProps = {
 function Kpi({ label, value, color }: { label: string; value: string; color?: string }) {
     return (
         <div className="glass-surface rounded-xl p-5 flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</span>
-            <span className="text-2xl font-bold font-outfit tabular-nums" style={color ? { color } : undefined}>{value}</span>
+            <span className="text-base font-semibold uppercase tracking-wider text-gray-400">{label}</span>
+            <span className="text-4xl font-bold font-outfit tabular-nums" style={color ? { color } : undefined}>{value}</span>
         </div>
     );
 }
@@ -174,7 +184,7 @@ function SlicePie({ data, innerRadius }: { data: { name: string; value: number; 
                         const pct = (entry as { payload?: { pct?: number } })?.payload?.pct;
                         return pct != null ? `${name} (${pct.toFixed(0)}%)` : String(name);
                     }}
-                    wrapperStyle={{ fontSize: 10, color: "#9ca3af" }}
+                    wrapperStyle={{ fontSize: 14, color: "#9ca3af" }}
                 />
             </PieChart>
         </ResponsiveContainer>
@@ -186,10 +196,10 @@ function RankBar({ data, color }: { data: { name: string; value: number }[]; col
         <ResponsiveContainer width="100%" height={230} minWidth={1} minHeight={1}>
             <BarChart data={data} layout="vertical" margin={{ left: 24, right: 40 }}>
                 <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#9ca3af", fontSize: 14 }} axisLine={false} tickLine={false} />
                 <Tooltip {...tooltipProps} />
-                <Bar isAnimationActive={false} dataKey="value" fill={color} radius={[0, 4, 4, 0]} barSize={18}>
-                    <LabelList dataKey="value" position="right" formatter={money} style={{ fill: "#9ca3af", fontSize: 10 }} />
+                <Bar isAnimationActive={false} dataKey="value" fill={color} radius={[0, 4, 4, 0]} barSize={24}>
+                    <LabelList dataKey="value" position="right" formatter={money} style={{ fill: "#9ca3af", fontSize: 14 }} />
                 </Bar>
             </BarChart>
         </ResponsiveContainer>

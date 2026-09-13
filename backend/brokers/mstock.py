@@ -34,6 +34,7 @@ BASE_URL = "https://api.mstock.trade"
 LOGIN_URL = f"{BASE_URL}/openapi/typea/connect/login"
 VERIFY_TOTP_URL = f"{BASE_URL}/openapi/typea/session/verifytotp"
 HOLDINGS_URL = f"{BASE_URL}/openapi/typeb/portfolio/holdings"
+FUNDS_URL = f"{BASE_URL}/openapi/typea/user/fundsummary"
 
 # Response JSON may use any of these keys for the session token depending on
 # API version/typeA vs typeB quirks — first match wins.
@@ -131,3 +132,27 @@ class MStockConnector(BrokerConnector):
                 )
             )
         return holdings
+
+    def fetch_funds(self) -> float:
+        self.ensure_session()
+        api_key = self.credentials["api_key"]
+        headers = {
+            "X-Mirae-Version": "1",
+            "Authorization": f"Bearer {self._access_token}",
+            "X-PrivateKey": api_key,
+        }
+        try:
+            with httpx.Client(timeout=15) as client:
+                resp = client.get(FUNDS_URL, headers=headers)
+                resp.raise_for_status()
+                payload = resp.json()
+        except httpx.HTTPError as e:
+            raise BrokerConnectionError(f"mStock funds fetch failed: {e}") from e
+
+        data = payload.get("data", {})
+        # The key we found earlier is AVAILABLE_BALANCE
+        balance_str = data.get("AVAILABLE_BALANCE", "0")
+        try:
+            return float(balance_str)
+        except ValueError:
+            return 0.0

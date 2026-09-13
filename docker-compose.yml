@@ -9,8 +9,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-finflow_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_password}
       POSTGRES_DB: ${POSTGRES_DB:-finflow_db}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,8 +21,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: finflow-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -43,10 +39,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-finflow_user}:${POSTGRES_PASSWORD:-finflow_password}@db:5432/${POSTGRES_DB:-finflow_db}
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -61,15 +59,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://finflow.fortressintelligence.space/api
     container_name: finflow-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: https://finflow.fortressintelligence.space/api
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
 
 volumes:
   postgres_data:

@@ -20,6 +20,15 @@ async function fetchHoldings(): Promise<Holding[]> {
     return res.json();
 }
 
+async function fetchCash(): Promise<number> {
+    const res = await fetch(`${API}/holdings/cash`, { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!res.ok) {
+        return 0.0;
+    }
+    const data = await res.json();
+    return data.cash_balance || 0.0;
+}
+
 type Tab = "summary" | "holdings";
 
 interface Props {
@@ -29,6 +38,7 @@ interface Props {
 
 export function HoldingsDashboard({ isOpen, onClose }: Props) {
     const [rows, setRows] = useState<Holding[]>([]);
+    const [cash, setCash] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [tab, setTab] = useState<Tab>("summary");
@@ -37,7 +47,12 @@ export function HoldingsDashboard({ isOpen, onClose }: Props) {
         setLoading(true);
         setError(null);
         try {
-            setRows(await fetchHoldings());
+            const [holdingsData, cashData] = await Promise.all([
+                fetchHoldings(),
+                fetchCash()
+            ]);
+            setRows(holdingsData);
+            setCash(cashData);
         } catch (e) {
             setError((e as Error).message);
         } finally {
@@ -62,9 +77,9 @@ export function HoldingsDashboard({ isOpen, onClose }: Props) {
                     />
                     <motion.div
                         initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
-                        className="fixed inset-x-0 top-8 bottom-0 z-50 mx-auto w-full max-w-[1320px] px-4"
+                        className="fixed inset-0 z-50 mx-auto w-full max-w-none p-4 md:p-8"
                     >
-                        <div className="glass-surface h-full overflow-y-auto rounded-t-3xl border border-white/10 shadow-2xl p-6 md:p-10" style={{ background: "rgba(8,12,24,0.98)" }}>
+                        <div className="glass-surface h-full w-full overflow-y-auto rounded-3xl border border-white/10 shadow-2xl p-6 md:p-10" style={{ background: "rgba(8,12,24,0.98)" }}>
                             <button
                                 onClick={onClose}
                                 className="absolute top-5 right-6 p-2 rounded-full hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
@@ -119,7 +134,7 @@ export function HoldingsDashboard({ isOpen, onClose }: Props) {
                                 </p>
                             )}
 
-                            {rows.length > 0 && tab === "summary" && <SummaryPanel rows={rows} />}
+                            {rows.length > 0 && tab === "summary" && <SummaryPanel rows={rows} cash={cash} />}
                             {rows.length > 0 && tab === "holdings" && <HoldingsTable rows={rows} onReload={load} />}
                         </div>
                     </motion.div>

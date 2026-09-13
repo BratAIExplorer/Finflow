@@ -2,6 +2,8 @@
 
 This guide explains how to host FinFlow on any VPS (DigitalOcean, AWS, Linode, Hostinger, etc.) using Docker.
 
+> **Status: already deployed.** Live at `http://76.13.179.32:3001` (Hostinger). See `CURRENT_STATUS.md` for the live URLs, what was fixed, and what's still missing (HTTPS). The steps below are the general playbook — for *this* deployment specifically, ports were remapped to 8001/3001 (VPS already runs other apps on 8000/3000/5432) and Postgres/Redis were kept container-internal (no public port).
+
 ## 📋 Prerequisites
 1.  **VPS Server**: Ubuntu 22.04 LTS (Recommended) with at least 2GB RAM.
 2.  **Domain Name** (Optional but recommended).
