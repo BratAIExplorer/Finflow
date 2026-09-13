@@ -7,8 +7,10 @@ A premium financial dashboard for families to track assets, manage insurance, an
 - 💰 Asset tracking (add/view family assets)
 - 👨‍👩‍👧 Family management (invitations, shared access)
 - 📊 Premium glassmorphism dashboard UI (Next.js 19 + Tailwind)
+- 📈 Broker holdings dashboard — mStock + Zerodha (2 accounts) connectors, read-only, with RSI/MACD/52-week-range signals from a free public price feed (backend code + offline tests done; not yet wired into the frontend UI — see `backend/routers/holdings.py`)
 
 **In Development:**
+- Broker holdings dashboard — frontend screen (backend is ready, see above)
 - Broker connectors (Binance, Luno)
 - Insurance forms & templates
 - Loan request workflows
@@ -74,10 +76,20 @@ FinFlow/
 │   ├── models.py            # Database schemas
 │   ├── auth.py              # JWT/login logic
 │   ├── currency.py          # Exchange rate API
+│   ├── crypto_utils.py      # Encrypts broker credentials at rest
+│   ├── pricing.py           # Free price feed + RSI/MACD/52-week signals
+│   ├── plain_flags.py       # Plain-language "what to know" rules (tax/price flags)
+│   ├── brokers/
+│   │   ├── base.py          # BrokerConnector interface every broker implements
+│   │   ├── mstock.py        # mStock connector (free API, TOTP-automatable)
+│   │   └── zerodha.py       # Zerodha connector (free API, daily one-click login)
+│   ├── tests/
+│   │   └── test_holdings.py # Offline tests — no real credentials/network needed
 │   └── routers/
 │       ├── auth.py          # Authentication endpoints
 │       ├── assets.py        # Asset CRUD
-│       └── family.py        # Family invites/sharing
+│       ├── family.py        # Family invites/sharing
+│       └── holdings.py      # Broker account + holdings endpoints
 │
 ├── frontend/                # Next.js 19 dashboard
 │   ├── app/                 # Page routes
@@ -133,6 +145,16 @@ Once backend is running, visit `http://localhost:8000/docs`:
 - `POST /family/invite` — Invite family member
 - `GET /family/members` — List family
 
+**Broker holdings (mStock / Zerodha):**
+- `POST /holdings/accounts` — Connect a broker account (`plugin_name`: `"mstock"` or `"zerodha"`, `label` e.g. "Dad's mStock", `credentials`)
+- `GET /holdings/accounts` — List connected broker accounts and last sync status
+- `POST /holdings/accounts/{plugin_id}/sync` — mStock: fully automatic (TOTP-based). Zerodha: needs a fresh daily session — see the two endpoints below first
+- `GET /holdings/accounts/{plugin_id}/zerodha-login-url` — Zerodha only: the URL to send the person to once a day (their official login flow requires this — see `backend/brokers/zerodha.py`)
+- `GET /holdings/accounts/{plugin_id}/zerodha-callback?request_token=...` — Zerodha only: where their browser redirects back to; completes the day's session and syncs in one step
+- `GET /holdings/` — Combined holdings across every connected account, with gain/loss, 52-week range, RSI/MACD, a plain-language trend label, and tax/price flags
+
+Requires `APP_ENCRYPTION_KEY` in `.env` (see `.env.example`) — broker credentials are encrypted before they're stored. Offline test suite: `pytest backend/tests/test_holdings.py -v` (21 tests, no real credentials or network needed — mocked HTTP).
+
 ---
 
 ## Docker (Production Deployment)
@@ -175,7 +197,7 @@ Then:
 - **Frontend**: Next.js 19 + React 19 + Tailwind CSS
 - **Auth**: JWT tokens, bcrypt hashing
 - **Caching**: Redis (optional, configured in docker-compose)
-- **Broker APIs**: Binance, Luno (future)
+- **Broker APIs**: mStock, Zerodha (holdings, read-only, backend done); Binance, Luno (future)
 
 ---
 

@@ -12,3 +12,8 @@ httpx>=0.26.0
 redis>=5.0.1
 cryptography>=41.0.7
 python-dotenv>=1.0.0
+
+# Broker holdings dashboard (mStock + Zerodha connectors)
+pyotp>=2.9.0
+yfinance>=0.2.40
+pandas>=2.2.0

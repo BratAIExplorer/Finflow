@@ -6,10 +6,29 @@ import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/ui/StatCard";
 import { PortfolioChart } from "@/components/ui/PortfolioChart";
 import { AddAssetForm } from "@/components/AddAssetForm";
-import { useState } from "react";
+import { BrokerSettings } from "@/components/BrokerSettings";
+import { HoldingsDashboard } from "@/components/HoldingsDashboard";
+import { LoginModal, TOKEN_KEY } from "@/components/LoginModal";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
+  const [isBrokerOpen, setIsBrokerOpen] = useState(false);
+  const [isHoldingsOpen, setIsHoldingsOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    setAuthed(!!localStorage.getItem(TOKEN_KEY));
+  }, []);
+
+  const signOut = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    setAuthed(false);
+  };
+
+  // A view that needs auth calls this; opens the login modal if not signed in.
+  const requireAuth = (open: () => void) => () => (authed ? open() : setIsLoginOpen(true));
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -37,10 +56,15 @@ export default function Home() {
       <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
         <div className="glass-surface py-3 px-6 rounded-full flex items-center justify-between glass-border shadow-2xl">
           <div className="text-xl font-bold font-outfit tracking-tighter prime-gradient-text">FINFLOW</div>
-          <div className="flex gap-6 text-sm font-medium text-gray-400">
-            <a href="#" className="hover:text-white transition-colors">Platform</a>
-            <a href="#" className="hover:text-white transition-colors">Plugins</a>
+          <div className="flex gap-5 text-sm font-medium text-gray-400">
+            <button onClick={requireAuth(() => setIsHoldingsOpen(true))} className="hover:text-white transition-colors">Portfolio</button>
+            <button onClick={requireAuth(() => setIsBrokerOpen(true))} className="hover:text-white transition-colors">Plugins</button>
             <a href="#" className="hover:text-white transition-colors">Family</a>
+            {authed ? (
+              <button onClick={signOut} className="hover:text-white transition-colors">Sign out</button>
+            ) : (
+              <button onClick={() => setIsLoginOpen(true)} className="text-indigo-300 hover:text-white transition-colors">Sign in</button>
+            )}
           </div>
         </div>
       </nav>
@@ -77,7 +101,7 @@ export default function Home() {
 
           <motion.div variants={itemVariants} className="mt-10 flex gap-4 justify-center">
             <button
-              onClick={() => alert("Welcome to FinFlow Prime! Manual Asset Forms coming next.")}
+              onClick={authed ? () => setIsHoldingsOpen(true) : () => setIsLoginOpen(true)}
               className="px-8 py-4 rounded-full bg-white text-black font-bold text-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.3)] z-20 cursor-pointer"
             >
               Get Started <ArrowRight className="w-4 h-4" />
@@ -220,6 +244,9 @@ export default function Home() {
 
       {/* Asset Form Modal */}
       <AddAssetForm isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
+      <BrokerSettings isOpen={isBrokerOpen} onClose={() => setIsBrokerOpen(false)} />
+      <HoldingsDashboard isOpen={isHoldingsOpen} onClose={() => setIsHoldingsOpen(false)} />
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onAuthed={() => setAuthed(true)} />
     </div>
   );
 }

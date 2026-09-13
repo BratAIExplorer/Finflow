@@ -1,4 +1,21 @@
-# FinFlow — Verified Status (2026-07-03)
+# FinFlow — Verified Status (2026-07-03, holdings dashboard 2026-09-10)
+
+## ✅ Verified 2026-09-10 — Holdings dashboard + login (mock data)
+
+Run against local SQLite seeded with mock data: 1 user, **3 broker accounts
+(2 Zerodha + 1 mStock)**, 7 holdings. Mock data cleared after the run.
+
+- ✅ **Login modal** (ported from Fortress) — create account + sign in, JWT stored, nav flips to "Sign out".
+- ✅ **Portfolio → Summary tab** — KPI tiles + all 6 charts render (sector pie, cap donut, top-5 investment, invested-vs-returns, top-5 returns); Large/Mid/Small/Penny filter works.
+- ✅ **Portfolio → Holdings tab** — every column populates (owner, broker, ticker/company, held, prices, 52-wk range, gain/loss, RSI, MACD, trend, flags).
+- ✅ **Inline purchase-date edit** — setting a date on a row updates days-held and adds the long-term-tax flag on reload (`PATCH /holdings/positions/{id}`).
+- ✅ **Plugins modal** — 3 seeded accounts listed with sync/edit/delete; Add-Broker form shows the correct per-broker credential fields for mStock and Zerodha.
+- ✅ **Backend** — 21 tests pass (`pytest backend/tests/`); `frontend` `tsc --noEmit` clean.
+- ✅ **`.env` now loaded** by `backend/main.py` on startup.
+
+Not tested: any real broker credentials (none used); company news section (not built).
+
+---
 
 ## ✅ What Works RIGHT NOW
 

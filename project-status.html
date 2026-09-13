@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinFlow — Project Status</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0b1120; color: #e2e8f0; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+header { border-bottom: 1px solid #1e293b; padding-bottom: 20px; margin-bottom: 8px; }
+h1 { margin: 0 0 4px; font-size: 26px; }
+.meta { color: #94a3b8; font-size: 13px; }
+.meta code { background: #1e293b; padding: 1px 6px; border-radius: 4px; }
+section { border-top: 1px solid #1e293b; padding-top: 8px; margin-top: 32px; }
+.src { display: inline-block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: #64748b; background: #131c2e; border: 1px solid #1e293b; border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+h2 { font-size: 20px; margin: 28px 0 8px; }
+h3 { font-size: 16px; margin: 20px 0 6px; color: #cbd5e1; }
+ul { padding-left: 22px; }
+li { margin: 3px 0; }
+code { background: #1e293b; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+pre { background: #131c2e; border: 1px solid #1e293b; border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+a { color: #7dd3fc; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th, td { border: 1px solid #1e293b; padding: 6px 10px; text-align: left; }
+th { background: #131c2e; }
+hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
+@media (prefers-color-scheme: light) {
+  body { background: #f8fafc; color: #0f172a; }
+  header, section { border-color: #e2e8f0; }
+  .meta { color: #475569; } .meta code, code, th { background: #e2e8f0; }
+  pre, .src { background: #f1f5f9; border-color: #e2e8f0; }
+  h3 { color: #334155; } a { color: #0369a1; }
+  th, td, hr { border-color: #e2e8f0; }
+}
+</style></head><body><div class="wrap">
+<header>
+<h1>FinFlow — Project Status</h1>
+<div class="meta">Generated 2026-09-10 15:23 UTC &middot; branch <code>main</code> &middot;
+commit <code>c3c8cd5</code> &middot; feat: support SQLite for local development (zero setup required)</div>
+</header>
+<section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 10, 2026)</h1>
+<h2>✅ Completed</h2>
+<ul>
+<li><strong>Architecture</strong>: Decoupled multi-product architecture finalized.</li>
+<li><strong>Backend</strong>: FastAPI structure with Auth, Assets, and Family modules.</li>
+<li><strong>Database</strong>: PostgreSQL schema for manual entries and portfolio aggregation. SQLite used automatically for local dev.</li>
+<li><strong>Multi-Currency</strong>: Basic FX service working for conversion and formatting.</li>
+<li><strong>Broker holdings backend (mStock + Zerodha)</strong>: <code>BrokerConnector</code> interface, both connectors, <code>Holding</code>/<code>UserPlugin</code> models, credential encryption, RSI/MACD/52-week price signals (free Yahoo Finance feed), plain-language tax/price flags, and <code>/holdings/*</code> API endpoints. 21 offline tests passing (<code>pytest backend/tests/ -v</code>).</li>
+<li><strong>Holdings dashboard frontend (NEW — Sep 10)</strong>: <code>Portfolio</code> modal with two tabs.</li>
+<li><strong>Summary tab</strong>: KPI tiles (current value, invested, returns, growth %), Investment-by-Sector pie, Investment-by-Capitalisation donut, Top-5-by-Investment, Invested-vs-Returns, Top-5-by-Returns, plus a Large/Mid/Small/Penny filter. Built with recharts.</li>
+<li><strong>Holdings tab</strong>: one row per position — owner, broker badge, ticker + company name, days held, buy/current price, 52-week range bar, gain/loss, RSI + plain gloss, MACD + plain gloss, trend label, rule-based flags.</li>
+<li><strong>Purchase date / days-held (NEW)</strong>: brokers don&#x27;t send it, so each row has an inline date picker. Setting it activates the days-held count and the long-term-tax flag. New <code>PATCH /holdings/positions/{id}</code> endpoint; new <code>first_buy_date</code> handling.</li>
+<li><strong>Company enrichment (NEW)</strong>: each sync now also pulls company name, sector and market-cap tier from Yahoo (best-effort — nulls tolerated). New <code>company_name</code> / <code>sector</code> / <code>cap_tier</code> columns on <code>Holding</code>.</li>
+<li><strong>Login screen (NEW)</strong>: glass modal ported from <code>C:\Antigravity\Fortress</code>, adapted to FinFlow&#x27;s FastAPI JWT (token in <code>localStorage</code>). Sign in / create account, wired to <code>/auth/register</code> + <code>/auth/login</code>. <code>Sign in</code> / <code>Sign out</code> in the nav; protected views prompt login.</li>
+<li><strong><code>.env</code> loading (fix)</strong>: <code>backend/main.py</code> now calls <code>load_dotenv()</code> on startup — the app previously never read <code>.env</code>, so <code>APP_ENCRYPTION_KEY</code> was invisible to <code>uvicorn</code>.</li>
+<li><strong>Tested end-to-end with mock data (Sep 10)</strong>: 3 accounts (2 Zerodha + 1 mStock = multi-account AND multi-broker), 7 holdings. Login, Summary charts, Holdings table, inline date edit → flag recompute, and the Add-Broker form all verified in-browser. Mock data then cleared.</li>
+</ul>
+<h2>🏗️ In Progress</h2>
+<ul>
+<li><strong>UI Design</strong>: premium &quot;Glassmorphism&quot; design system rollout.</li>
+<li><strong>Manual Forms</strong>: Asset entry forms for Insurance and Loans.</li>
+<li><strong>Broker holdings — going live</strong>: still no real broker credentials used. First live mStock sync will likely need small fixes (see the &quot;CONFIRM-BEFORE-LIVE&quot; note in <code>backend/brokers/mstock.py</code>).</li>
+</ul>
+<h2>⏳ Next Up</h2>
+<p>1. Connect dad&#x27;s real mStock account through the <strong>Plugins</strong> modal, run one sync, and confirm the response shape matches <code>brokers/mstock.py</code>&#x27;s assumptions. Repeat for both Zerodha accounts. 2. &quot;Latest company news&quot; section on the holdings screen — needs a news feed + a backend endpoint (not built). 3. Decide storage: local SQLite is fine for now; move to Postgres on the VPS before multi-device or historical tracking (there is no price history table yet — only the latest snapshot per holding). 4. Commit the untracked broker + holdings + login files. 5. <strong>Portfolio Connectors</strong>: read-only API integration for Binance and Luno. 6. <strong>Family Roll-up</strong>: combined net-worth views for family accounts.</p>
+<h2>🚧 Blockers</h2>
+<ul>
+<li><strong>mStock/Zerodha credentials</strong>: backend + frontend built and tested with mock data, but nothing has touched a real broker account yet.</li>
+<li><strong>API Keys</strong>: need personal read-only keys for Binance/Luno real-data testing.</li>
+</ul>
+<h2>💡 Ecosystem Note</h2>
+<p>The <strong>ARUN Trading Bot</strong> is now a separate standalone project. FinFlow will eventually integrate with it via a read-only database connection to show &quot;Bot Managed&quot; assets in the total net worth view.</p></section><section><div class="src">VERIFIED_STATUS.md</div><h1>FinFlow — Verified Status (2026-07-03, holdings dashboard 2026-09-10)</h1>
+<h2>✅ Verified 2026-09-10 — Holdings dashboard + login (mock data)</h2>
+<p>Run against local SQLite seeded with mock data: 1 user, <strong>3 broker accounts (2 Zerodha + 1 mStock)</strong>, 7 holdings. Mock data cleared after the run.</p>
+<ul>
+<li>✅ <strong>Login modal</strong> (ported from Fortress) — create account + sign in, JWT stored, nav flips to &quot;Sign out&quot;.</li>
+<li>✅ <strong>Portfolio → Summary tab</strong> — KPI tiles + all 6 charts render (sector pie, cap donut, top-5 investment, invested-vs-returns, top-5 returns); Large/Mid/Small/Penny filter works.</li>
+<li>✅ <strong>Portfolio → Holdings tab</strong> — every column populates (owner, broker, ticker/company, held, prices, 52-wk range, gain/loss, RSI, MACD, trend, flags).</li>
+<li>✅ <strong>Inline purchase-date edit</strong> — setting a date on a row updates days-held and adds the long-term-tax flag on reload (<code>PATCH /holdings/positions/{id}</code>).</li>
+<li>✅ <strong>Plugins modal</strong> — 3 seeded accounts listed with sync/edit/delete; Add-Broker form shows the correct per-broker credential fields for mStock and Zerodha.</li>
+<li>✅ <strong>Backend</strong> — 21 tests pass (<code>pytest backend/tests/</code>); <code>frontend</code> <code>tsc --noEmit</code> clean.</li>
+<li>✅ <strong><code>.env</code> now loaded</strong> by <code>backend/main.py</code> on startup.</li>
+</ul>
+<p>Not tested: any real broker credentials (none used); company news section (not built).</p>
+<hr>
+<h2>✅ What Works RIGHT NOW</h2>
+<h3>Backend (FastAPI)</h3>
+<ul>
+<li>✅ <strong>Python environment set up</strong> — All dependencies installed on Windows (no build tools needed)</li>
+<li>✅ <strong>Database module fixed</strong> — Removed bad <code>create_all</code> import (1-line fix)</li>
+<li>✅ <strong>App loads cleanly</strong> — <code>from backend.main import app</code> succeeds</li>
+<li>✅ <strong>All routers registered</strong> — auth, assets, family endpoints ready</li>
+<li>✅ <strong>Ready to test</strong> — Run <code>uvicorn backend.main:app --reload</code></li>
+</ul>
+<h3>Frontend (Next.js)</h3>
+<ul>
+<li>✅ <strong>node_modules installed</strong> — npm dependencies ready</li>
+<li>✅ <strong>Build works</strong> — <code>npm run build</code> succeeds</li>
+<li>✅ <strong>Dev server ready</strong> — <code>npm run dev</code> on port 3000</li>
+</ul>
+<h3>Database</h3>
+<ul>
+<li>✅ <strong>Schema defined</strong> — SQLAlchemy models for users, assets, families</li>
+<li>✅ <strong>Connection working</strong> — Engine initializes without error</li>
+<li>✅ <strong>Auto-create tables on startup</strong> — <code>Base.metadata.create_all(bind=engine)</code> ready</li>
+</ul>
+<h3>Documentation</h3>
+<ul>
+<li>✅ <strong>README.md</strong> — Comprehensive project overview + quick start</li>
+<li>✅ <strong>SETUP_LOCAL.md</strong> — Step-by-step local dev without Docker</li>
+<li>✅ <strong>QUICKSTART.md</strong> — Copy-paste terminal commands (fastest path)</li>
+<li>✅ <strong>.env.example</strong> — Template with all variables needed</li>
+<li>✅ <strong>docker-compose.yml</strong> — Production-ready services config</li>
+<li>✅ <strong>Dockerfiles</strong> — Both backend and frontend ready to containerize</li>
+</ul>
+<h3>Git</h3>
+<ul>
+<li>✅ <strong>Commits pushed</strong> — Bug fix + setup docs committed to main</li>
+</ul>
+<hr>
+<h2>🚀 To Test Yourself (2 terminals, 3 minutes)</h2>
+<h3>Terminal 1 — Backend</h3>
+<pre><code>cd C:\Antigravity\FinFlow
+venv\Scripts\Activate.ps1
+uvicorn backend.main:app --reload</code></pre>
+<p>→ Should see: <code>Uvicorn running on http://127.0.0.1:8000</code></p>
+<h3>Terminal 2 — Frontend</h3>
+<pre><code>cd C:\Antigravity\FinFlow\frontend
+npm run dev</code></pre>
+<p>→ Should see: <code>Local: http://localhost:3000</code></p>
+<h3>Browser — Test</h3>
+<p>1. <strong>API Docs</strong>: Open <code>http://localhost:8000/docs</code></p>
+<ul>
+<li>Try POST <code>/auth/register</code> with email + password</li>
+<li>Try GET <code>/assets</code> (will be empty until you add one)</li>
+</ul>
+<p>2. <strong>Dashboard</strong>: Open <code>http://localhost:3000</code></p>
+<ul>
+<li>See the glassmorphism UI load</li>
+<li>Register → login → add asset → dashboard updates</li>
+</ul>
+<hr>
+<h2>📝 What&#x27;s NOT Built Yet</h2>
+<p>These features are documented in code but not yet implemented:</p>
+<ul>
+<li>Binance connector (buy/sell orders)</li>
+<li>Luno connector</li>
+<li>Insurance forms</li>
+<li>Loan request workflows</li>
+<li>Email notifications</li>
+</ul>
+<p>See <code>CURRENT_STATUS.md</code> (dated Feb 7, 2026) for feature checklist.</p>
+<hr>
+<h2>🐛 Bugs Fixed</h2>
+<table><thead><tr><th>Issue</th><th>Status</th><th>Fix</th></tr></thead><tbody>
+<tr><td><code>from sqlalchemy import create_all</code> fails</td><td>✅ Fixed</td><td>Removed line 1 of <code>backend/database.py</code></td></tr>
+<tr><td>No setup documentation</td><td>✅ Fixed</td><td>Created SETUP_LOCAL.md + QUICKSTART.md</td></tr>
+<tr><td>Empty docker-compose.yml</td><td>✅ Fixed</td><td>Added production config with all services</td></tr>
+<tr><td>README.md empty</td><td>✅ Fixed</td><td>Comprehensive project overview</td></tr>
+<tr><td>requirements.txt has old versions</td><td>✅ Fixed</td><td>Relaxed constraints for Windows wheels</td></tr>
+</tbody></table>
+<hr>
+<h2>🎯 Next Steps for You</h2>
+<p>1. <strong>Try it yourself</strong>: Follow Terminal 1 → Terminal 2 → Browser steps above 2. <strong>Explore the code</strong>: Now that it runs, check what&#x27;s in each module 3. <strong>Build features</strong>: Follow TDD approach (write test, make pass, refactor) 4. <strong>Deploy</strong>: When ready, see DEPLOYMENT.md for VPS setup</p>
+<hr>
+<h2>📊 Project Health</h2>
+<table><thead><tr><th>Metric</th><th>Status</th></tr></thead><tbody>
+<tr><td>Backend starts</td><td>✅ Yes</td></tr>
+<tr><td>Frontend builds</td><td>✅ Yes</td></tr>
+<tr><td>Database connects</td><td>✅ Yes</td></tr>
+<tr><td>Dependencies install</td><td>✅ Yes (Windows-friendly)</td></tr>
+<tr><td>Documentation complete</td><td>✅ Yes</td></tr>
+<tr><td>Production config ready</td><td>✅ Yes (docker-compose)</td></tr>
+<tr><td>API endpoints tested</td><td>✅ Interactive docs available</td></tr>
+</tbody></table>
+<hr>
+<h2>🔗 Quick Links</h2>
+<ul>
+<li><strong><a href="QUICKSTART.md">QUICKSTART.md</a></strong> — Copy-paste to run (fastest)</li>
+<li><strong><a href="SETUP_LOCAL.md">SETUP_LOCAL.md</a></strong> — Detailed step-by-step</li>
+<li><strong><a href="README.md">README.md</a></strong> — Project overview</li>
+<li><strong><a href="DEPLOYMENT.md">DEPLOYMENT.md</a></strong> — VPS production setup</li>
+<li><strong><a href="docker-compose.yml">docker-compose.yml</a></strong> — Container config</li>
+</ul>
+<hr>
+<h2>Verification Timestamp</h2>
+<ul>
+<li>✅ Backend imports: Verified 2026-07-03 16:45 UTC</li>
+<li>✅ Frontend npm ready: Verified 2026-07-03 16:45 UTC</li>
+<li>✅ Database schema: Verified 2026-07-03 16:45 UTC</li>
+<li>✅ All docs created: Committed 2026-07-03 16:48 UTC</li>
+</ul>
+<p><strong>Status: READY FOR LOCAL TESTING</strong> 🎉</p></section>
+</div></body></html>

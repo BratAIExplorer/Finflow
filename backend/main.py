@@ -1,7 +1,11 @@
+from dotenv import load_dotenv
+
+load_dotenv()  # read .env before any module (database, auth, crypto_utils) checks os.getenv
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from .database import init_db
-from .routers import auth, assets, family
+from .routers import auth, assets, family, holdings
 
 app = FastAPI(title="FinFlow API")
 
@@ -12,6 +16,7 @@ def on_startup():
 app.include_router(auth.router)
 app.include_router(assets.router)
 app.include_router(family.router)
+app.include_router(holdings.router)
 
 app.add_middleware(
     CORSMiddleware,
