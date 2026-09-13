@@ -1,3 +1,5 @@
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()  # read .env before any module (database, auth, crypto_utils) checks os.getenv
@@ -7,7 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import init_db
 from .routers import auth, assets, family, holdings
 
-app = FastAPI(title="FinFlow API")
+IS_DEV = os.getenv("ENVIRONMENT", "production").lower() == "development"
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", "https://finflow.fortressintelligence.space"
+).split(",")
+
+app = FastAPI(title="FinFlow API", docs_url="/docs" if IS_DEV else None, redoc_url="/redoc" if IS_DEV else None)
 
 @app.on_event("startup")
 def on_startup():
@@ -20,7 +27,7 @@ app.include_router(holdings.router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

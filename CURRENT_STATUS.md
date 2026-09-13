@@ -23,7 +23,7 @@ Live-tested against the deployed VPS, not just read from source:
 - **Secrets**: `SECRET_KEY`, `APP_ENCRYPTION_KEY`, DB password are random-generated, live only in the VPS's `/opt/FinFlow/.env`, never committed.
 - **Network exposure**: Postgres and Redis are container-internal only (fixed this session — both were previously bound to `0.0.0.0` with no auth, reachable from the open internet).
 - **Transport**: real HTTPS via Let's Encrypt on `finflow.fortressintelligence.space`, nginx reverse proxy, HTTP→HTTPS redirect.
-- **Not fixed, low priority**: `/docs` (Swagger UI) is publicly reachable — read-only API schema disclosure, not an exploit path by itself. `CORS allow_origins=["*"]` is broad but low-risk here since auth is a bearer token in `localStorage`, not a cookie (no ambient-credential CSRF risk). Tighten both if this ever needs to look more locked-down, not urgent for a single-family app.
+- **Fixed (Sep 13, 2026 follow-up)**: `/docs` and `/redoc` are now disabled unless `ENVIRONMENT=development` is set (defaults to off — the VPS doesn't set this, so prod stays locked). `CORS allow_origins` now reads from `ALLOWED_ORIGINS` env var, defaulting to `https://finflow.fortressintelligence.space` instead of `*`. See `backend/main.py`.
 - **Explicitly rejected**: a suggestion (from a separate parallel session) to copy the `.env` secrets and SQLite DB to Dad's laptop for a local install. Don't do this — it relocates the broker-credential encryption key onto a second, less-controlled machine and defeats the point of the hosted URL. See the walkthrough note in this session's transcript for the reasoning.
 
 ## ✅ Completed
