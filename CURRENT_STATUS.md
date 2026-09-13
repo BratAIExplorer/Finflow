@@ -1,4 +1,23 @@
-# FinFlow Current Status (Updated: Sep 13, 2026)
+# FinFlow Current Status (Updated: Sep 14, 2026)
+
+## 🧓 Senior-friendly Holdings redesign — Sep 14, 2026
+The Holdings tab was a data table pinned to `min-w-[1400px]` — 11 columns,
+guaranteed horizontal scroll on any laptop, small low-contrast secondary
+text. Replaced with a compact expandable row list per stock:
+- **Always visible**: stock, broker, owner, shares, buy price, current
+  price, gain/loss — no sideways scrolling, no matter how many stocks.
+- **Tap a row** to reveal RSI, MACD, trend, 52-week range, and flags —
+  detail is one tap away instead of a mandatory extra 6 columns.
+- Held-duration shows a plain day count (`held 1187 days`) — simplified
+  from an earlier `Xy Yd` / `X years Y months` attempt per user feedback
+  ("just number of days held").
+- Validated against a 20+ multi-broker mock portfolio scenario before
+  building — a full-card-per-stock layout was considered and rejected
+  because it doesn't scan quickly at that volume; the tap-to-expand row
+  keeps scanning fast while eliminating horizontal scroll entirely.
+- Fixed a real `.gitignore` bug found in the process: a bare `lib/` rule
+  (meant for Python venvs) was silently excluding `frontend/lib/` — real
+  TypeScript source that had never once been committed to git.
 
 ## 🌐 LIVE ON VPS
 Deployed and QA-verified on Hostinger VPS `76.13.179.32` (shared box, also runs Kyro/dealzoda/smartnri — used non-conflicting ports):
