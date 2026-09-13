@@ -2,9 +2,9 @@
 
 ## 🌐 LIVE ON VPS
 Deployed and QA-verified on Hostinger VPS `76.13.179.32` (shared box, also runs Kyro/dealzoda/smartnri — used non-conflicting ports):
-- **App (what Dad opens)**: `http://76.13.179.32:3001`
-- **API** (not for Dad, used by the app itself): `http://76.13.179.32:8001`
-- No domain yet, so **no HTTPS** — login password travels unencrypted over the network. Fine for a first look; get a domain + Caddy/nginx reverse proxy with Let's Encrypt before relying on this day to day, especially since mStock broker credentials pass through it.
+- **App (what Dad opens)**: `https://finflow.fortressintelligence.space` — real HTTPS, free Let's Encrypt cert via certbot, auto-renews. DNS: A record `finflow` → `76.13.179.32` on the `fortressintelligence.space` Namecheap zone (added 2026-09-13).
+- Old bare-IP links (`http://76.13.179.32:3001` / `:8001`) still work directly but skip HTTPS — use the domain instead.
+- nginx reverse-proxies `/` → frontend container (3001) and `/api/` → backend container (8001), both container-internal now; only 80/443 are meant to be used externally.
 - Secrets (`SECRET_KEY`, `APP_ENCRYPTION_KEY`, DB password) live only in `/opt/FinFlow/.env` on the VPS — not committed to git, not in this repo.
 - Postgres and Redis are container-internal only (no public port) — fixed during this deploy, they were originally exposed to the whole internet with no password.
 
@@ -12,6 +12,19 @@ Deployed and QA-verified on Hostinger VPS `76.13.179.32` (shared box, also runs 
 1. `docker-compose.yml` bind-mounted the frontend source over the built container image, hiding `node_modules`/`.next` — container crash-looped on every restart.
 2. `bcrypt` 4.1+ broke `passlib`'s internal self-test, so `/auth/register` 500'd on every signup. Pinned `bcrypt==4.0.1` in `requirements.txt`.
 3. `NEXT_PUBLIC_API_URL` wasn't passed as a Docker build arg, so the browser bundle would have pointed at `localhost:8000` instead of the real backend.
+
+## 🔒 Security Audit — Sep 13, 2026 (signed off)
+Live-tested against the deployed VPS, not just read from source:
+- **IDOR**: registered two real test accounts, confirmed user B gets `404`/`[]` trying to read, PATCH, or DELETE user A's broker account/holdings by guessing IDs. Every route in `holdings.py`, `assets.py`, `family.py` requires `get_current_user` and filters by `current_user.id`.
+- **Auth bypass**: no-token request to a protected route → `401`. Confirmed.
+- **SQL injection**: probed the login form with a classic `' OR '1'='1` payload — SQLAlchemy ORM parameterizes everything, no effect.
+- **Weak passwords (found + fixed)**: server accepted `"1234"` via direct API call — the 8-char minimum was frontend-only. Added a server-side check in `backend/routers/auth.py`; now returns `422`.
+- **Brute force (found + fixed)**: no limit on failed logins. Added an in-memory 5-attempts/5-minute lockout per email (`429` after 5 fails) — `ponytail: single-worker in-memory lockout, move to Redis if this ever runs multi-worker`.
+- **Secrets**: `SECRET_KEY`, `APP_ENCRYPTION_KEY`, DB password are random-generated, live only in the VPS's `/opt/FinFlow/.env`, never committed.
+- **Network exposure**: Postgres and Redis are container-internal only (fixed this session — both were previously bound to `0.0.0.0` with no auth, reachable from the open internet).
+- **Transport**: real HTTPS via Let's Encrypt on `finflow.fortressintelligence.space`, nginx reverse proxy, HTTP→HTTPS redirect.
+- **Not fixed, low priority**: `/docs` (Swagger UI) is publicly reachable — read-only API schema disclosure, not an exploit path by itself. `CORS allow_origins=["*"]` is broad but low-risk here since auth is a bearer token in `localStorage`, not a cookie (no ambient-credential CSRF risk). Tighten both if this ever needs to look more locked-down, not urgent for a single-family app.
+- **Explicitly rejected**: a suggestion (from a separate parallel session) to copy the `.env` secrets and SQLite DB to Dad's laptop for a local install. Don't do this — it relocates the broker-credential encryption key onto a second, less-controlled machine and defeats the point of the hosted URL. See the walkthrough note in this session's transcript for the reasoning.
 
 ## ✅ Completed
 - **Architecture**: Decoupled multi-product architecture finalized.
