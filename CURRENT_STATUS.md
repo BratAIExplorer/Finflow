@@ -423,7 +423,12 @@ Live-tested against the deployed VPS, not just read from source:
 - **Architecture**: Decoupled multi-product architecture finalized.
 - **Backend**: FastAPI structure with Auth, Assets, and Family modules.
 - **Database**: PostgreSQL schema for manual entries and portfolio aggregation. SQLite used automatically for local dev.
-- **Multi-Currency**: Basic FX service working for conversion and formatting.
+- **Multi-Currency**: FX service working for conversion and formatting (MYR, INR, USD, SGD).
+- **Theme Engine**: Complete **Light Mode (White)** and **Dark Mode** toggle switch with smooth animations and persistent user preference.
+- **Adaptive Glassmorphism**: Tailored frosted glass styling for both dark midnight and clean bright light modes.
+- **Typography Scaling**: Increased font size scale (+15–20% boost) across all components (Hero, Net Worth, Stat cards, inputs, charts) for effortless readability.
+- **Docker & VPS Deployment**: Standalone production Next.js Dockerfile, FastAPI Dockerfile, multi-container `docker-compose.yml`, automated `deploy.sh` script, and `.env.example`.
+- **Code Utilities**: Standardized `cn` utility (`clsx` + `tailwind-merge`) resolving compilation dependencies.
 - **Broker holdings backend (mStock + Zerodha)**: `BrokerConnector` interface, both connectors, `Holding`/`UserPlugin` models, credential encryption, RSI/MACD/52-week price signals (free Yahoo Finance feed), plain-language tax/price flags, and `/holdings/*` API endpoints. 21 offline tests passing (`pytest backend/tests/ -v`).
 - **Holdings dashboard frontend (NEW — Sep 10)**: `Portfolio` modal with two tabs.
   - **Summary tab**: KPI tiles (current value, invested, returns, growth %), Investment-by-Sector pie, Investment-by-Capitalisation donut, Top-5-by-Investment, Invested-vs-Returns, Top-5-by-Returns, plus a Large/Mid/Small/Penny filter. Built with recharts.
