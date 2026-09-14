@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Loader2, ArrowLeft } from "lucide-react";
 import { Holding } from "@/lib/holdingsFormat";
-import { TOKEN_KEY } from "@/components/LoginModal";
+import { LoginModal, TOKEN_KEY } from "@/components/LoginModal";
 import { SummaryPanel } from "@/components/portfolio/SummaryPanel";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
 import { NewsPanel } from "@/components/portfolio/NewsPanel";
@@ -39,6 +39,7 @@ export default function PortfolioPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [tab, setTab] = useState<Tab>("summary");
+    const [showLogin, setShowLogin] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -63,6 +64,7 @@ export default function PortfolioPage() {
     }, [load, router]);
 
     const empty = !loading && !error && rows.length === 0;
+    const sessionExpired = !!error && (error.includes("401") || error.toLowerCase().includes("credential"));
 
     return (
         <div className="min-h-screen bg-[#030712] text-white p-6 md:p-10">
@@ -103,11 +105,19 @@ export default function PortfolioPage() {
                 </div>
 
                 {error && (
-                    <p className="text-sm text-rose-400 mb-6">
-                        {error.includes("401") || error.toLowerCase().includes("credential")
-                            ? "Session expired — sign in again."
-                            : error}
-                    </p>
+                    <div className="flex items-center gap-3 mb-6">
+                        <p className="text-sm text-rose-400">
+                            {sessionExpired ? "Session expired — sign in again." : error}
+                        </p>
+                        {sessionExpired && (
+                            <button
+                                onClick={() => setShowLogin(true)}
+                                className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                            >
+                                Sign in
+                            </button>
+                        )}
+                    </div>
                 )}
 
                 {empty && tab !== "news" && (
@@ -123,6 +133,14 @@ export default function PortfolioPage() {
                     <p className="text-sm text-gray-400">Add holdings first — news is matched to your portfolio.</p>
                 ))}
             </div>
+            <LoginModal
+                isOpen={showLogin}
+                onClose={() => setShowLogin(false)}
+                onAuthed={() => {
+                    setShowLogin(false);
+                    load();
+                }}
+            />
         </div>
     );
 }

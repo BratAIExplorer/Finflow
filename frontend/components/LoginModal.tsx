@@ -147,6 +147,8 @@ export function LoginModal({ isOpen, onClose, onAuthed }: Props) {
                                 {mode === "signin" ? (
                                     <>Don&apos;t have an account?{" "}
                                         <button onClick={() => { setMode("register"); setError(""); }} className="text-indigo-400 hover:underline">Create one</button>
+                                        <br />
+                                        <span className="text-xs text-gray-500">Forgot your password? Ask the admin to reset it — no self-serve reset yet.</span>
                                     </>
                                 ) : (
                                     <>Already have an account?{" "}

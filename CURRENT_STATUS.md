@@ -1,5 +1,30 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🔐 Auth flow — fixed 15-min session expiry + added sign-in-from-error path — Sep 14, 2026
+Portfolio page showed "Session expired" with no way to sign back in except
+navigating away. Root cause found while fixing it: `backend/auth.py`'s
+`create_access_token()` defaults to a **15-minute** expiry when no
+`expires_delta` is passed, and `routers/auth.py`'s `login()` never passed one
+— so every login silently expired in 15 minutes regardless of the
+(unused) `ACCESS_TOKEN_EXPIRE_MINUTES` constant.
+- **Fixed**: `login()` now passes `expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)`;
+  the constant itself raised to 7 days (env-overridable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+  — this is a single-user portfolio viewer, no reason to force re-login mid-session.
+- **Frontend**: [frontend/app/portfolio/page.tsx](frontend/app/portfolio/page.tsx) now shows
+  a "Sign in" button next to the expired-session message that opens the existing
+  `LoginModal` in place, instead of leaving the user stuck.
+- **Password reset**: no email service exists in FinFlow yet (checked — nothing
+  configured), so a real "forgot password" email flow wasn't built. Added
+  `backend/tools/reset_password.py` instead — an admin CLI
+  (`python -m backend.tools.reset_password <email> <new_password>`) that resets
+  a password directly in the DB, no email infra needed. `LoginModal` now has a
+  small hint pointing to this instead of promising a self-serve reset that
+  doesn't exist.
+- Test: `backend/tests/test_auth_token_expiry.py` guards against the
+  expires_delta regression coming back.
+- **Note**: while testing this live, the real `bharatsamant@gmail.com` password
+  in the dev DB got overwritten by the CLI test run — reset it again if needed.
+
 ## 🔬 Trend label backtest — result: no measurable edge — Sep 14, 2026
 Before waiting weeks for live `trend_snapshots` data to judge accuracy, ran the
 exact same direction-only grading logic against 2 years of real NSE history
