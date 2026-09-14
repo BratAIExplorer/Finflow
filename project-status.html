@@ -38,10 +38,44 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 01:47 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
-commit <code>1a35291</code> &middot; feat: track trend-call accuracy over time (holdings)</div>
+<div class="meta">Generated 2026-09-14 02:02 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
+commit <code>39d6b4d</code> &middot; feat: capture trend snapshot on every manual sync, not just the daily job</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
+<h2>🔬 Trend label backtest — result: no measurable edge — Sep 14, 2026</h2>
+<p>Before waiting weeks for live <code>trend_snapshots</code> data to judge accuracy, ran the exact same direction-only grading logic against 2 years of real NSE history (16 liquid large/mid-caps: RELIANCE, TCS, HDFCBANK, INFY, etc.) instead — answers the &quot;is this trustworthy?&quot; question today, not in 30 days.</p>
+<ul>
+<li><strong>New</strong>: <code>backend/tools/backtest_trend.py</code> — `python -m backend.tools.backtest_trend</li>
+</ul>
+<p>  [SYMBOL...]<code>. Vectorized (computes RSI/MACD/ADX once per symbol over the   full history, no lookahead — confirmed by   </code>test_backtest_symbol_produces_no_lookahead_rows`), so it runs in seconds,   not the weeks the live tracker needs.</p>
+<ul>
+<li>**Result — current <code>classify_trend()</code> rule table has no measurable</li>
+</ul>
+<p>  directional edge<strong>: hit rates across all 4 labels (Bullish/Bearish/Very   Bullish/Very Bearish) and all 3 windows (1/7/30 days) landed at </strong>45–53%**   — indistinguishable from a coin flip (n=1,100–2,100 per cell, so this isn&#x27;t   a small-sample fluke).</p>
+<ul>
+<li><strong>Tested the ADX-filter idea from the trend-improvement discussion</strong> (only</li>
+</ul>
+<p>  grade/act on calls made when ADX ≥ 20, i.e. an actual trend is underway,   not chop) — <strong>no improvement</strong>: 46–53% gated vs. 45–53% ungated, same   coin-flip range. The hypothesis that whipsaw-in-chop was the main accuracy   problem did not hold up against real data.</p>
+<ul>
+<li><strong>Conclusion, stated plainly</strong>: RSI+MACD alone is not currently a validated</li>
+</ul>
+<p>  trading signal for this portfolio&#x27;s stocks over these windows. Not changing   <code>classify_trend()</code>&#x27;s live logic on the strength of an unproven &quot;fix&quot; —   ADX gating was reverted from <code>pricing.py</code> (no production code depends on   it; it stays as backtest-only, ported from   <code>C:\Antigravity\TradingBot\regime_monitor.py</code>&#x27;s <code>_calculate_adx()</code>).</p>
+<ul>
+<li><strong>What this means for Dad&#x27;s dashboard right now</strong>: the trend label should</li>
+</ul>
+<p>  be read as descriptive (&quot;here&#x27;s what RSI/MACD currently say&quot;), not   predictive. The <code>trend_snapshots</code> tracker built alongside this (below)   still ships — it&#x27;s what will show, with real numbers over time, whether   that changes; right now the backtest says don&#x27;t expect it to.</p>
+<ul>
+<li>Reused, not rebuilt: the ADX Wilder formula came from</li>
+</ul>
+<p>  <code>TradingBot/regime_monitor.py</code>; the &quot;no-lookahead&quot; backtest discipline   followed <code>TradingBot/strategies/factor_backtest.py</code>&#x27;s stated honesty rules.   <code>TradingBot/_dev_tools/backtester.py</code> (uses the <code>backtesting.py</code> package)   was reviewed but not reused — it&#x27;s built for simulating buy/sell trades   with cash/commission, a different shape of problem than grading a label&#x27;s   hit rate.</p>
+<ul>
+<li>Tests: <code>backend/tests/test_backtest_trend.py</code> (7 tests) — including a</li>
+</ul>
+<p>  regression test for a real bug hit during this work (see below).</p>
+<ul>
+<li><strong>Bug found + fixed during this work</strong>: the backtest&#x27;s hit-rate columns</li>
+</ul>
+<p>  were stored as <code>numpy.bool_</code> in an object-dtype DataFrame column, which   silently broke <code>.mean()</code> under <code>groupby()</code> — first run showed ~0.1% hit   rates (obviously wrong, not &quot;the strategy is terrible&quot;). Root-caused to the   dtype, fixed by storing native Python <code>bool</code>, re-verified against a manual   count, and added <code>test_summarize_hit_rate_matches_manual_count_at_scale</code> +   <code>test_backtest_symbol_hit_values_are_native_bool_not_numpy_bool</code> so it   can&#x27;t silently regress.</p>
 <h2>📈 Trend accuracy tracking (NEW) — Sep 14, 2026</h2>
 <p>Dad decides buy/sell based on the Bullish/Bearish trend label, but until now only the *latest* label was ever stored — no way to check if a past call was right. Added:</p>
 <ul>

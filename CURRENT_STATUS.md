@@ -1,5 +1,54 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🔬 Trend label backtest — result: no measurable edge — Sep 14, 2026
+Before waiting weeks for live `trend_snapshots` data to judge accuracy, ran the
+exact same direction-only grading logic against 2 years of real NSE history
+(16 liquid large/mid-caps: RELIANCE, TCS, HDFCBANK, INFY, etc.) instead —
+answers the "is this trustworthy?" question today, not in 30 days.
+- **New**: `backend/tools/backtest_trend.py` — `python -m backend.tools.backtest_trend
+  [SYMBOL...]`. Vectorized (computes RSI/MACD/ADX once per symbol over the
+  full history, no lookahead — confirmed by
+  `test_backtest_symbol_produces_no_lookahead_rows`), so it runs in seconds,
+  not the weeks the live tracker needs.
+- **Result — current `classify_trend()` rule table has no measurable
+  directional edge**: hit rates across all 4 labels (Bullish/Bearish/Very
+  Bullish/Very Bearish) and all 3 windows (1/7/30 days) landed at **45–53%**
+  — indistinguishable from a coin flip (n=1,100–2,100 per cell, so this isn't
+  a small-sample fluke).
+- **Tested the ADX-filter idea from the trend-improvement discussion** (only
+  grade/act on calls made when ADX ≥ 20, i.e. an actual trend is underway,
+  not chop) — **no improvement**: 46–53% gated vs. 45–53% ungated, same
+  coin-flip range. The hypothesis that whipsaw-in-chop was the main accuracy
+  problem did not hold up against real data.
+- **Conclusion, stated plainly**: RSI+MACD alone is not currently a validated
+  trading signal for this portfolio's stocks over these windows. Not changing
+  `classify_trend()`'s live logic on the strength of an unproven "fix" —
+  ADX gating was reverted from `pricing.py` (no production code depends on
+  it; it stays as backtest-only, ported from
+  `C:\Antigravity\TradingBot\regime_monitor.py`'s `_calculate_adx()`).
+- **What this means for Dad's dashboard right now**: the trend label should
+  be read as descriptive ("here's what RSI/MACD currently say"), not
+  predictive. The `trend_snapshots` tracker built alongside this (below)
+  still ships — it's what will show, with real numbers over time, whether
+  that changes; right now the backtest says don't expect it to.
+- Reused, not rebuilt: the ADX Wilder formula came from
+  `TradingBot/regime_monitor.py`; the "no-lookahead" backtest discipline
+  followed `TradingBot/strategies/factor_backtest.py`'s stated honesty rules.
+  `TradingBot/_dev_tools/backtester.py` (uses the `backtesting.py` package)
+  was reviewed but not reused — it's built for simulating buy/sell trades
+  with cash/commission, a different shape of problem than grading a label's
+  hit rate.
+- Tests: `backend/tests/test_backtest_trend.py` (7 tests) — including a
+  regression test for a real bug hit during this work (see below).
+- **Bug found + fixed during this work**: the backtest's hit-rate columns
+  were stored as `numpy.bool_` in an object-dtype DataFrame column, which
+  silently broke `.mean()` under `groupby()` — first run showed ~0.1% hit
+  rates (obviously wrong, not "the strategy is terrible"). Root-caused to the
+  dtype, fixed by storing native Python `bool`, re-verified against a manual
+  count, and added `test_summarize_hit_rate_matches_manual_count_at_scale` +
+  `test_backtest_symbol_hit_values_are_native_bool_not_numpy_bool` so it
+  can't silently regress.
+
 ## 📈 Trend accuracy tracking (NEW) — Sep 14, 2026
 Dad decides buy/sell based on the Bullish/Bearish trend label, but until now
 only the *latest* label was ever stored — no way to check if a past call was
