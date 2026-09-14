@@ -1,10 +1,13 @@
-"""Daily trend-accuracy tracking: record each day's trend call for every held
-stock, then grade older calls against what the price actually did.
+"""Trend-accuracy tracking: record each trend call for every held stock, then
+grade older calls against what the price actually did.
 
-Both functions reuse pricing.compute_signals()/classify_trend() — the exact
-same calculation the manual "sync now" button and the dashboard already use
-(see routers/holdings.py). This module only adds the write-to-history +
-grading step; it introduces no new price/indicator logic.
+record_snapshot() is called both by the daily scheduled job (below) and by
+the manual "sync now" route (routers/holdings.py) — every sync or scheduled
+refresh writes a row, so intraday trend flips are captured too, not just the
+once-a-day scheduled snapshot. All of it reuses
+pricing.compute_signals()/classify_trend() — the exact calculation the
+dashboard already uses; this module only adds the write-to-history +
+grading step, no new price/indicator logic.
 """
 import logging
 from datetime import datetime, timedelta
@@ -19,6 +22,27 @@ logger = logging.getLogger(__name__)
 _WINDOWS = (1, 7, 30)  # days
 
 
+def record_snapshot(db: Session, holding: Holding, signals: pricing.PriceSignals) -> TrendSnapshot:
+    """Build (and add, uncommitted) one TrendSnapshot row from already-computed
+    signals. Shared by the daily job and the manual "sync now" route so both
+    write history the same way — holding.id must already be flushed/assigned
+    before calling this."""
+    trend = pricing.classify_trend(signals.rsi_14, signals.macd_hist)
+    snap = TrendSnapshot(
+        holding_id=holding.id,
+        symbol=holding.symbol,
+        exchange=holding.exchange,
+        captured_at=datetime.utcnow(),
+        price_at_capture=signals.last_price,
+        rsi_14=signals.rsi_14,
+        macd_hist=signals.macd_hist,
+        trend_label=trend["label"],
+        direction=trend["direction"],
+    )
+    db.add(snap)
+    return snap
+
+
 def snapshot_all_holdings(db: Session) -> int:
     """Insert one TrendSnapshot per Holding using today's signals. Returns the
     count written. Best-effort per holding — a Yahoo failure for one symbol
@@ -31,18 +55,7 @@ def snapshot_all_holdings(db: Session) -> int:
             logger.warning("trend snapshot skipped for %s: %s", holding.symbol, e)
             continue
 
-        trend = pricing.classify_trend(signals.rsi_14, signals.macd_hist)
-        db.add(TrendSnapshot(
-            holding_id=holding.id,
-            symbol=holding.symbol,
-            exchange=holding.exchange,
-            captured_at=datetime.utcnow(),
-            price_at_capture=signals.last_price,
-            rsi_14=signals.rsi_14,
-            macd_hist=signals.macd_hist,
-            trend_label=trend["label"],
-            direction=trend["direction"],
-        ))
+        record_snapshot(db, holding, signals)
         written += 1
 
     db.commit()

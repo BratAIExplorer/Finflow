@@ -12,6 +12,7 @@ from ..brokers.base import BrokerConnectionError
 from ..brokers.mstock import MStockConnector
 from ..brokers.zerodha import ZerodhaConnector
 from .. import pricing
+from ..jobs.trend_snapshot import record_snapshot
 from ..plain_flags import build_flags
 from .auth import get_current_user
 
@@ -177,6 +178,8 @@ def _run_sync(plugin: UserPlugin, connector, db: Session):
             holding.week52_low = signals.week52_low
             holding.rsi_14 = signals.rsi_14
             holding.macd_hist = signals.macd_hist
+            db.flush()  # assigns holding.id if this is a new row, needed by record_snapshot below
+            record_snapshot(db, holding, signals)
         except ValueError as e:
             price_failures.append({"symbol": raw.symbol, "reason": str(e)})
 

@@ -38,8 +38,8 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 01:40 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
-commit <code>6268e31</code> &middot; feat: Portfolio as full page with Summary/Holdings/News tabs</div>
+<div class="meta">Generated 2026-09-14 01:47 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
+commit <code>1a35291</code> &middot; feat: track trend-call accuracy over time (holdings)</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
 <h2>📈 Trend accuracy tracking (NEW) — Sep 14, 2026</h2>
@@ -49,13 +49,13 @@ commit <code>6268e31</code> &middot; feat: Portfolio as full page with Summary/H
 </ul>
 <p>  day — label, RSI/MACD, price at capture, and hit/miss outcome columns for   1-day, 7-day, and 30-day windows (null = still pending).</p>
 <ul>
-<li><strong><code>backend/jobs/trend_snapshot.py</code></strong>: <code>snapshot_all_holdings()</code> records</li>
+<li><strong><code>backend/jobs/trend_snapshot.py</code></strong>: <code>record_snapshot()</code> writes one row</li>
 </ul>
-<p>  today&#x27;s call for every held stock (reuses the existing   <code>pricing.compute_signals</code>/<code>classify_trend</code> — no new price logic);   <code>grade_pending_snapshots()</code> checks due windows against the current price   and marks hit/miss by direction only (Bullish = hit if price rose,   Bearish = hit if it fell; Neutral is never graded).</p>
+<p>  from already-computed signals (reuses <code>pricing.compute_signals</code>/   <code>classify_trend</code> — no new price logic); <code>grade_pending_snapshots()</code> checks   due windows against the current price and marks hit/miss by direction only   (Bullish = hit if price rose, Bearish = hit if it fell; Neutral is never   graded). <code>record_snapshot()</code> is called from <strong>two</strong> places, per user   request: the manual &quot;sync now&quot; route (<code>holdings.py</code>) *and* the daily   scheduled job — so an intraday trend flip from Dad clicking refresh gets   captured too, not just the once-a-day scheduled call. This means multiple   rows/day are possible on days he refreshes more than once — expected, not   a bug.</p>
 <ul>
-<li><strong>Scheduled via in-process APScheduler</strong> (<code>backend/main.py</code>, started in the</li>
+<li><strong>Daily job scheduled via in-process APScheduler</strong> (<code>backend/main.py</code>,</li>
 </ul>
-<p>  existing <code>on_startup</code> hook), daily at 16:00 IST — chosen over VPS crontab   since it ships inside the container automatically, no host-side setup   needed on the shared Hostinger box.</p>
+<p>  started in the existing <code>on_startup</code> hook) at 16:00 IST, as a safety net   for days nobody opens the dashboard — chosen over VPS crontab since it   ships inside the container automatically, no host-side setup needed on the   shared Hostinger box.</p>
 <ul>
 <li><strong>New endpoint</strong>: <code>GET /holdings/{id}/trend-history</code> — same ownership</li>
 </ul>

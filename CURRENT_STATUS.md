@@ -7,16 +7,22 @@ right. Added:
 - **`trend_snapshots` table** (`backend/models.py`): one row per holding per
   day — label, RSI/MACD, price at capture, and hit/miss outcome columns for
   1-day, 7-day, and 30-day windows (null = still pending).
-- **`backend/jobs/trend_snapshot.py`**: `snapshot_all_holdings()` records
-  today's call for every held stock (reuses the existing
-  `pricing.compute_signals`/`classify_trend` — no new price logic);
-  `grade_pending_snapshots()` checks due windows against the current price
-  and marks hit/miss by direction only (Bullish = hit if price rose,
-  Bearish = hit if it fell; Neutral is never graded).
-- **Scheduled via in-process APScheduler** (`backend/main.py`, started in the
-  existing `on_startup` hook), daily at 16:00 IST — chosen over VPS crontab
-  since it ships inside the container automatically, no host-side setup
-  needed on the shared Hostinger box.
+- **`backend/jobs/trend_snapshot.py`**: `record_snapshot()` writes one row
+  from already-computed signals (reuses `pricing.compute_signals`/
+  `classify_trend` — no new price logic); `grade_pending_snapshots()` checks
+  due windows against the current price and marks hit/miss by direction only
+  (Bullish = hit if price rose, Bearish = hit if it fell; Neutral is never
+  graded). `record_snapshot()` is called from **two** places, per user
+  request: the manual "sync now" route (`holdings.py`) *and* the daily
+  scheduled job — so an intraday trend flip from Dad clicking refresh gets
+  captured too, not just the once-a-day scheduled call. This means multiple
+  rows/day are possible on days he refreshes more than once — expected, not
+  a bug.
+- **Daily job scheduled via in-process APScheduler** (`backend/main.py`,
+  started in the existing `on_startup` hook) at 16:00 IST, as a safety net
+  for days nobody opens the dashboard — chosen over VPS crontab since it
+  ships inside the container automatically, no host-side setup needed on the
+  shared Hostinger box.
 - **New endpoint**: `GET /holdings/{id}/trend-history` — same ownership
   check as `PATCH /holdings/positions/{id}`, returns the stored snapshots.
 - Not built yet (deliberately, per the plan): no frontend accuracy widget —

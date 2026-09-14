@@ -16,7 +16,7 @@ import pytest
 
 from backend import pricing
 from backend.models import Base, Holding, TrendSnapshot
-from backend.jobs.trend_snapshot import snapshot_all_holdings, grade_pending_snapshots
+from backend.jobs.trend_snapshot import snapshot_all_holdings, grade_pending_snapshots, record_snapshot
 
 
 @pytest.fixture
@@ -113,6 +113,45 @@ def test_grade_pending_marks_miss_when_price_moved_wrong_way(monkeypatch, db):
     db.refresh(snap)
     assert snap.hit_1d is False
     assert snap.hit_7d is None  # window not due yet
+
+
+# ---------- record_snapshot (used by manual "sync now", not just the daily job) ----------
+
+def test_record_snapshot_works_for_a_brand_new_holding_before_commit(db):
+    """Mirrors routers/holdings.py's sync path: a new Holding is db.add()-ed,
+    flushed (to get its id), then record_snapshot is called immediately —
+    proving a manual sync writes history too, not just the scheduled job."""
+    holding = Holding(plugin_id="p1", user_id="u1", symbol="TCS", exchange="NSE",
+                       quantity=5, avg_buy_price=3000.0)
+    db.add(holding)
+    db.flush()
+    assert holding.id is not None  # sanity: flush assigned the uuid default
+
+    signals = pricing.PriceSignals(last_price=3200.0, week52_high=3300.0,
+                                    week52_low=2800.0, rsi_14=58.0, macd_hist=0.3)
+    record_snapshot(db, holding, signals)
+    db.commit()
+
+    snap = db.query(TrendSnapshot).filter(TrendSnapshot.holding_id == holding.id).one()
+    assert snap.trend_label == "Bullish"
+    assert snap.price_at_capture == 3200.0
+
+
+def test_multiple_syncs_same_day_write_multiple_rows(db):
+    """Per user decision: refreshing more than once a day should capture each
+    call, not just one-per-day — so intraday trend flips aren't lost."""
+    holding = _add_holding(db)
+    signals_a = pricing.PriceSignals(last_price=1000.0, week52_high=1100.0,
+                                      week52_low=900.0, rsi_14=62.0, macd_hist=0.6)
+    signals_b = pricing.PriceSignals(last_price=980.0, week52_high=1100.0,
+                                      week52_low=900.0, rsi_14=38.0, macd_hist=-0.6)
+    record_snapshot(db, holding, signals_a)
+    record_snapshot(db, holding, signals_b)
+    db.commit()
+
+    snaps = db.query(TrendSnapshot).filter(TrendSnapshot.holding_id == holding.id).all()
+    assert len(snaps) == 2
+    assert {s.trend_label for s in snaps} == {"Very Bullish", "Very Bearish"}
 
 
 def test_grade_pending_ignores_neutral_snapshots(monkeypatch, db):
