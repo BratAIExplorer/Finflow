@@ -14,9 +14,9 @@ const data = [
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         return (
-            <div className="glass-surface p-3 rounded-lg border border-white/10 shadow-xl">
-                <p className="text-xs text-gray-400 mb-1">{label}</p>
-                <p className="text-sm font-bold font-outfit text-white">
+            <div className="glass-surface p-3.5 rounded-xl border border-slate-200/80 dark:border-white/10 shadow-xl">
+                <p className="text-sm text-slate-500 dark:text-gray-400 mb-1 font-medium">{label}</p>
+                <p className="text-base font-extrabold font-outfit text-slate-900 dark:text-white">
                     ${payload[0].value.toLocaleString()}
                 </p>
             </div>
@@ -27,12 +27,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function PortfolioChart() {
     return (
-        <div className="w-full h-[300px] w-full">
+        <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <AreaChart data={data}>
                     <defs>
                         <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
                             <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                         </linearGradient>
                     </defs>
@@ -40,7 +40,7 @@ export function PortfolioChart() {
                         dataKey="month"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                        tick={{ fill: '#64748b', fontSize: 14, fontWeight: 600 }}
                         dy={10}
                     />
                     <YAxis hide />
@@ -48,8 +48,8 @@ export function PortfolioChart() {
                     <Area
                         type="monotone"
                         dataKey="value"
-                        stroke="#818cf8"
-                        strokeWidth={2}
+                        stroke="#6366f1"
+                        strokeWidth={2.5}
                         fillOpacity={1}
                         fill="url(#colorValue)"
                     />

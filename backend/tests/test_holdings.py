@@ -146,7 +146,7 @@ class _FakeClient:
 def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
     from backend.brokers import mstock
 
-    login_resp = _FakeResponse({"data": {}})
+    login_resp = _FakeResponse({"status": "success"})
     totp_resp = _FakeResponse({"data": {"access_token": "fake-jwt"}})
     holdings_resp = _FakeResponse({
         "data": [

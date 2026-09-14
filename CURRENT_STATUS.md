@@ -34,6 +34,114 @@ each only visible after fixing the one before it — no guessing skipped:
   (`0c5a96e`, `eb46360`, `89c394f`, `4cfe197`), copied to the VPS, image
   rebuilt, container recreated each time.
 
+## 🐛 Regression Fixed: CORS/localhost:8000 on Live Site — Sep 14, 2026
+The VPS redeploy above (theme-engine fix) introduced a real regression:
+merging `main`'s `frontend/Dockerfile` wholesale dropped the
+`ARG NEXT_PUBLIC_API_URL` / `ENV` wiring the old Dockerfile had. Since
+Next.js inlines `NEXT_PUBLIC_*` vars at **build time**, every component
+(`portfolio/page.tsx`, `BrokerSettings`, `LoginModal`, `HoldingsTable`,
+`MarketBoardPanel`, `NewsPanel`) silently fell back to its
+`http://localhost:8000` default — breaking every API call on the live site
+with `CORS policy: No 'Access-Control-Allow-Origin' header` errors, since
+the browser was trying to reach `localhost` instead of
+`https://finflow.fortressintelligence.space/api`.
+
+**Fix**: restored the two missing lines in `frontend/Dockerfile`'s builder
+stage (`ARG NEXT_PUBLIC_API_URL` + `ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}`)
+so `docker-compose.yml`'s existing build arg actually reaches the build.
+Verified locally (built bundle has zero `localhost:8000` occurrences, real
+URL present) and on the live container (`docker exec finflow-frontend grep`
+— 0 `localhost:8000`, 4 files with the correct origin) before calling it
+done. Pushed as `7249a9c` on `main`, redeployed to the VPS.
+
+**Lesson**: when a merge conflict resolution replaces a whole file (not a
+targeted patch), diff the old and new versions for *behavior*, not just
+"does it look more complete" — the newer Dockerfile looked like a strict
+upgrade (multi-stage, non-root user, standalone output) but silently
+dropped a load-bearing build arg the old one had. Worth an explicit
+post-merge smoke test against the deployed environment's actual origin,
+not just `tsc`/`build` succeeding.
+
+## 🚀 VPS Deploy Drift Fixed: Theme Engine Now Actually Live — Sep 14, 2026
+Discovered the Light/Dark toggle documented as "done" (see below) had never
+reached the live site, because three copies of the frontend had silently
+diverged:
+- `main` (git) had the real theme-engine code (`ThemeToggle.tsx`, pre-hydration
+  script, typography scale).
+- `feature/market-board-tab` (git) was branched before that commit and never
+  merged it — same hardcoded `className="dark"` bug, no toggle.
+- **The VPS itself (`/opt/FinFlow`) has no `.git` at all** — it's a manual
+  `scp`/file-drop deploy that had drifted from *both* branches independently,
+  and turned out to match `feature/market-board-tab`'s pre-merge state almost
+  byte-for-byte (confirmed via diff before touching anything).
+- A second, unused nested copy at `/opt/FinFlow/Finflow/frontend/` (not
+  referenced by `docker-compose.yml`'s build context) added to the confusion
+  during investigation — left in place, harmless, but worth cleaning up.
+
+**Fix**: merged `main` into `feature/market-board-tab` locally (real 2-parent
+merge — resolved 11 conflicts across `.env.example`, `.gitignore`,
+`CURRENT_STATUS.md`, `DEPLOYMENT.md`, `README.md`, `docker-compose.yml`,
+`frontend/Dockerfile`, `layout.tsx`, `page.tsx`, `PortfolioChart.tsx`,
+`lib/utils.ts`), keeping this branch's auth flow (`LoginModal`,
+`BrokerSettings`, `requireAuth` gating) alongside `main`'s `ThemeToggle` and
+styling. Verified backend pytest (65/66 — see known-issue note below) and a
+clean frontend production build before pushing to `origin/feature/market-board-tab`.
+Then `scp`'d the merged frontend files to `/opt/FinFlow/frontend/` (the real
+build path) via a one-off SSH key set up for this session, and rebuilt the
+`frontend` container. Verified live: `finflow-theme` (the toggle's
+localStorage key) and the "Sign in" button both present in the served HTML,
+public site returns `200`.
+
+**Known pre-existing issue (not caused by this work, not fixed yet)**:
+`backend/tests/test_holdings.py::test_mstock_fetch_holdings_parses_and_filters_zero_qty`
+fails because its fake HTTP fixture only queues one response before the
+`ensure_session()` call, but that method now makes two real calls
+(`/login` then `/verifytotp`) since `ec0aa98`'s 502-fix. No production
+impact — the connector logic is correct, only the test fixture is stale.
+
+**Follow-up recommended, not done yet**: set up a real `git clone` on the VPS
+so future deploys are `git pull && rebuild` instead of hand-copied files —
+today's whole investigation started because the server silently drifted from
+every git branch with no way to diff against it.
+
+## 📊 Deepak's Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026
+Migrated the entire standalone market board functionality from `C:\Antigravity\My Bots\DadsDashboard` directly into FinFlow's `/portfolio` page as a dedicated **Market Board** tab placed right after News:
+- **Zero Functionality Lost**:
+  - Watchlist management: loads from `backend/board/my_stocks.txt` (seeded with Dad's 12 NSE stocks: `KERNEX`, `NETWEB`, `ROSSTECH`, `DATAPATTNS`, `IDEA`, `SMLMAH`, `AVALON`, `BSE`, `GVT&D`, `APOLLO`, `BLUESTONE`, `MTARTECH`).
+  - Price & Technical signals: yfinance quotes (`.NS`), Wilder's 14-period RSI with plain-language status (`Oversold — looks cheap`, `Weak`, `Neutral`, `Getting expensive`, `Overbought`), MACD 12/26/9 histogram with momentum status (`Rising — momentum up`, `Positive`, `Falling — momentum down`, `Negative`, `Flat`).
+  - 5-bucket Trend Verdict (`Very Bullish`, `Bullish`, `Neutral`, `Bearish`, `Very Bearish`) with color coding and direction arrows.
+  - Watchlist News: Google News RSS per watchlist stock, price-sensitive keyword tagging (`MATERIAL` keywords tuple -> red `IMPORTANT` badge), and sentiment classification (`pos`, `neg`, `neu`). Deduplication stored via SQLite `seen.sqlite`.
+  - Add / Remove stock: Form to add NSE symbol and company name, with interactive red ✕ chips to remove stocks.
+  - Desktop export: Retained export to `Desktop\MarketBoard` (`board_latest.csv`/`.xlsx`, `history.csv`/`.xlsx`, `news_history.csv`) for local environments; gracefully disabled in headless VPS/Docker environments.
+- **Backend Architecture**:
+  - New modular package `backend/board/` (`watchlist.py`, `data.py`, `news.py`, `export.py`).
+  - FastAPI router `backend/routers/board.py` registered at `/board/` with `GET /board/` (in-memory cached snapshot for instant tab switching), `POST /board/refresh`, `POST /board/add`, `POST /board/remove`.
+  - 15-minute background refresh job scheduled via in-process APScheduler alongside the daily trend job.
+- **Frontend Architecture**:
+  - `frontend/components/portfolio/MarketBoardPanel.tsx`: faithful senior-readable UI matching Deepak's Market Board with paper/cream aesthetics, large typography, indicator badges, and sources attribution table.
+  - `frontend/app/portfolio/page.tsx`: updated `Tab` type to `"summary" | "holdings" | "news" | "board"`, tab list with `"Market Board"` placed after `"news"`.
+- **Verification & Testing**:
+  - Hermetic unit tests in `backend/tests/test_board.py` with 100% offline pass rate (12/12 passed). Full test suite: 71 passed (71/71 passing).
+  - TypeScript compilation clean (`tsc --noEmit` exited with 0 errors).
+  - Next.js production build (`npm run build`) compiled successfully with static route `/portfolio`.
+
+## 📅 mStock Holding Acquisition Dates Auto-Reconciliation (NEW) — Sep 14, 2026
+Automated purchase date resolution for mStock holdings, eliminating the `held — set date` prompt:
+- **Root Cause Solved**: mStock's `/portfolio/holdings` endpoint aggregates positions without purchase timestamps, leaving `first_buy_date` empty and requiring manual entry.
+- **Session & Credential Reuse**: Reuses the user's existing encrypted API credentials and active session token stored in `UserPlugin` (no extra setup or user input required).
+- **FIFO Trade History Reconciliation**: `MStockConnector` automatically queries `GET /openapi/typea/trades` over the prior 365 days and runs a FIFO (First-In, First-Out) matching algorithm across BUY and SELL executions to pinpoint the acquisition date of remaining open lots.
+- **Automatic UI & Tax Flag Activation**: Persists `first_buy_date` to `Holding.first_buy_date`. The frontend automatically converts `held — set date` into the actual holding duration (e.g. `held 183 days`) and activates the >365-day Long-Term Capital Gains tax flag.
+- **Resilient Fallback**: Gracefully falls back to standard holding sync if the trades endpoint is unavailable or trades predate the query window.
+- **Tests**: Verified by unit test suite in `backend/tests/test_mstock_dates.py` (100% pass).
+
+## ☀️ / 🌙 Light & Dark Mode Engine + Typography Scaling — Sep 14, 2026
+Full dual-theme support and enhanced typography scale deployed to `main`:
+- **Light Mode (White) & Dark Mode Switcher**: Added an interactive Sun ☀️ / Moon 🌙 toggle button (`frontend/components/ThemeToggle.tsx`) in the floating glass navigation bar. Smooth animated pill transition with active theme state. User choice is stored in `localStorage` (`finflow-theme`) and loaded via pre-hydration script in `layout.tsx` to eliminate theme flashing.
+- **Adaptive Glassmorphism**: In `frontend/app/globals.css`, updated CSS tokens and `.glass-surface` styling to adapt dynamically: clean slate-50/white frosted cards with `border-slate-200/90` and crisp text in Light Mode, and midnight glass in Dark Mode.
+- **Increased Typography Scale**: Scaled base HTML font size to `17.5px` (+15–20% boost to all rem units) and enlarged component sizes: Hero Headline (`text-6xl md:text-8xl lg:text-9xl`), Net Worth (`text-5xl md:text-6xl`), Stat Cards (`text-3xl font-extrabold`), form inputs/labels (`text-base` / `text-sm`), and chart axis (`14px`).
+- **Production Docker & VPS Orchestration**: Added multi-stage standalone `frontend/Dockerfile`, `docker-compose.yml`, automated `deploy.sh` script, and `.env.example`.
+- **Code Health**: Added missing `frontend/lib/utils.ts` (`clsx` + `tailwind-merge`). Production build (`npm run build`) compiles with 0 errors.
+
 ## ⚠️ RETRACTION: neither momentum finding holds up — Sep 14, 2026
 Two entries below (**"Strongest finding yet: sector laggards bounce back"**
 and the Nifty-relative momentum result inside **"Two follow-up backtests"**)
@@ -512,7 +620,12 @@ Live-tested against the deployed VPS, not just read from source:
 - **Architecture**: Decoupled multi-product architecture finalized.
 - **Backend**: FastAPI structure with Auth, Assets, and Family modules.
 - **Database**: PostgreSQL schema for manual entries and portfolio aggregation. SQLite used automatically for local dev.
-- **Multi-Currency**: Basic FX service working for conversion and formatting.
+- **Multi-Currency**: FX service working for conversion and formatting (MYR, INR, USD, SGD).
+- **Theme Engine**: Complete **Light Mode (White)** and **Dark Mode** toggle switch with smooth animations and persistent user preference.
+- **Adaptive Glassmorphism**: Tailored frosted glass styling for both dark midnight and clean bright light modes.
+- **Typography Scaling**: Increased font size scale (+15–20% boost) across all components (Hero, Net Worth, Stat cards, inputs, charts) for effortless readability.
+- **Docker & VPS Deployment**: Standalone production Next.js Dockerfile, FastAPI Dockerfile, multi-container `docker-compose.yml`, automated `deploy.sh` script, and `.env.example`.
+- **Code Utilities**: Standardized `cn` utility (`clsx` + `tailwind-merge`) resolving compilation dependencies.
 - **Broker holdings backend (mStock + Zerodha)**: `BrokerConnector` interface, both connectors, `Holding`/`UserPlugin` models, credential encryption, RSI/MACD/52-week price signals (free Yahoo Finance feed), plain-language tax/price flags, and `/holdings/*` API endpoints. 21 offline tests passing (`pytest backend/tests/ -v`).
 - **Holdings dashboard frontend (NEW — Sep 10)**: `Portfolio` modal with two tabs.
   - **Summary tab**: KPI tiles (current value, invested, returns, growth %), Investment-by-Sector pie, Investment-by-Capitalisation donut, Top-5-by-Investment, Invested-vs-Returns, Top-5-by-Returns, plus a Large/Mid/Small/Penny filter. Built with recharts.

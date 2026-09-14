@@ -1,9 +1,9 @@
-# 🚀 Deployment Guide: VPS with Docker
+# 🚀 FinFlow VPS Production Deployment Guide
 
-This guide explains how to host FinFlow on any VPS (DigitalOcean, AWS, Linode, Hostinger, etc.) using Docker.
+This guide details how to deploy and maintain FinFlow on any Linux VPS (Ubuntu 22.04 / 24.04 LTS recommended on Hostinger, DigitalOcean, AWS, Linode, Hetzner, etc.) using Docker and Docker Compose.
 
 > **Status: already deployed, with HTTPS.** Live at `https://finflow.fortressintelligence.space` (Hostinger VPS `76.13.179.32`, nginx reverse proxy + free Let's Encrypt cert, auto-renews). Security-audited — see `CURRENT_STATUS.md` for the live URL, what was fixed, and the full audit. The steps below are the general playbook and don't match exactly how this instance was actually set up:
-> - Code was copied with `scp`/`tar` directly to `/opt/FinFlow`, not `git clone` — no GitHub deploy key was set up on the VPS.
+> - Code was copied with `scp`/`tar` directly to `/opt/FinFlow`, not `git clone` — no GitHub deploy key was set up on the VPS. **This is a known gap — see "Note on the current VPS deploy" below.**
 > - Ports are remapped to 8001 (API) / 3001 (app) internally — the VPS already runs other apps on 8000/3000/5432 — but neither is meant to be hit directly anymore; nginx on 80/443 is the front door.
 > - Postgres and Redis have no host port at all (container-internal only).
 > - To redeploy after a code change: `scp` the changed file(s) to `/opt/FinFlow/...` on the VPS, then `ssh root@76.13.179.32 "cd /opt/FinFlow && docker compose up -d --build <service>"` (`backend`, `frontend`, or omit the service name to rebuild everything).
@@ -15,75 +15,41 @@ This guide explains how to host FinFlow on any VPS (DigitalOcean, AWS, Linode, H
 
 ---
 
-## 🔄 The Workflow
+## 📋 System Requirements
 
-1.  **Local (You & Me)**: We build code here -> You commit to Git.
-2.  **GitHub**: Stores the source of truth.
-3.  **VPS**: Pulls code from GitHub -> Runs Docker containers.
-
----
-
-## Step 1: Set Up Git (Local)
-
-Since I (the AI) am writing files to your local machine, you need to push them to a repository.
-
-1.  **Initialize Git**:
-    ```bash
-    cd c:\Antigravity\FinFlow
-    git init
-    git add .
-    git commit -m "Initial commit - Phase 1 Foundation"
-    ```
-
-2.  **Create Repo on GitHub**:
-    - Go to GitHub -> New Repository -> "FinFlow" (Private).
-
-3.  **Link & Push**:
-    ```bash
-    git remote add origin https://github.com/YOUR_USERNAME/FinFlow.git
-    git branch -M main
-    git push -u origin main
-    ```
+- **OS**: Ubuntu 22.04 LTS / 24.04 LTS
+- **RAM**: 2GB minimum (4GB recommended for Docker builds)
+- **Disk**: 15GB+ SSD storage
+- **Ports**: 80 (HTTP), 443 (HTTPS), 3000 (Frontend), 8000 (Backend API)
 
 ---
 
-## Step 2: Set Up VPS (One-Time)
+## ⚡ Quick Deployment (Automated)
 
-SSH into your VPS:
+### 1. SSH into your VPS
 ```bash
-ssh root@your_vps_ip
+ssh root@YOUR_VPS_IP
 ```
 
-1.  **Install Docker & Compose**:
-    ```bash
-    apt update && apt upgrade -y
-    apt install docker.io docker-compose -y
-    systemctl enable --now docker
-    ```
-
-2.  **Generate SSH Key (for GitHub)**:
-    ```bash
-    ssh-keygen -t ed25519 -C "vps@finflow"
-    cat ~/.ssh/id_ed25519.pub
-    ```
-    - Copy this key and add it to valid **GitHub Repo -> Settings -> Deploy Keys**.
-
-3.  **Clone Repo**:
-    ```bash
-    cd /opt
-    git clone git@github.com:YOUR_USERNAME/FinFlow.git
-    cd FinFlow
-    ```
-
----
-
-## Step 3: Configure Environment
-
-Create the `.env` file on the VPS (DO NOT commit this file to Git):
-
+### 2. Install Docker & Git (if not already installed)
 ```bash
+apt update && apt upgrade -y
+apt install -y docker.io docker-compose git curl
+systemctl enable --now docker
+```
+
+### 3. Clone the Repository
+```bash
+git clone https://github.com/BratAIExplorer/Finflow.git /opt/Finflow
+cd /opt/Finflow
+```
+
+### 4. Configure Environment
+```bash
+cp .env.example .env
 nano .env
 ```
+*Customize your PostgreSQL password, database name, and secret keys.*
 
 Paste your production secrets:
 ```ini
@@ -100,26 +66,107 @@ EXCHANGERATE_API_KEY=your_real_api_key
 
 ---
 
-## Step 4: Run It! 🚀
-
-Start the application:
+### 5. Launch Application
 ```bash
-docker-compose up -d --build
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-- **Backend**: `http://your_vps_ip:8000`
-- **Docs**: `http://your_vps_ip:8000/docs`
+FinFlow will build and launch:
+- **Frontend (Light & Dark UI)**: `http://YOUR_VPS_IP:3000`
+- **Backend API**: `http://YOUR_VPS_IP:8000`
+- **API Swagger Documentation**: `http://YOUR_VPS_IP:8000/docs`
 
 ---
 
-## 🔄 How to Update
+## 🔄 Routine Updates & Redeployment
 
-When we add new features (Phase 2, 3, etc.):
+Whenever updates are pushed to the GitHub repository (`https://github.com/BratAIExplorer/Finflow`), updating your VPS is as simple as:
 
-1.  **Local**: You pull my changes, commit, and push.
-2.  **VPS**:
-    ```bash
-    cd /opt/FinFlow
-    git pull
-    docker-compose up -d --build
-    ```
+```bash
+cd /opt/Finflow
+./deploy.sh
+```
+
+The script automatically:
+1. Pulls the latest commits from `origin/main`.
+2. Rebuilds updated container images using Next.js standalone optimization and Python caching.
+3. Restarts the containers with zero downtime.
+
+---
+
+## 🔒 Optional: Domain & SSL Setup (Nginx + Certbot)
+
+To access your FinFlow dashboard via a secure custom domain (e.g., `https://finflow.yourdomain.com`):
+
+### 1. Install Nginx & Certbot
+```bash
+apt install -y nginx certbot python3-certbot-nginx
+```
+
+### 2. Create Nginx Site Configuration
+```bash
+nano /etc/nginx/sites-available/finflow
+```
+
+Add the following configuration:
+```nginx
+server {
+    server_name finflow.yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 3. Enable Site & Generate Free SSL Certificate
+```bash
+ln -s /etc/nginx/sites-available/finflow /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
+
+certbot --nginx -d finflow.yourdomain.com
+```
+
+---
+
+## 🛠️ Maintenance & Troubleshooting
+
+### View Container Logs
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f frontend
+docker-compose logs -f backend
+docker-compose logs -f db
+```
+
+### Restart Services
+```bash
+docker-compose restart
+```
+
+### Database Backup & Restore
+```bash
+# Backup
+docker exec -t finflow-db pg_dump -U finflow_user finflow_prod > backup_$(date +%F).sql
+
+# Restore
+cat backup_2026-09-14.sql | docker exec -i finflow-db psql -U finflow_user -d finflow_prod
+```

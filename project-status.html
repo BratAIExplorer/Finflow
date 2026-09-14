@@ -38,10 +38,76 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 03:36 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
-commit <code>14e272e</code> &middot; chore: bump Finflow submodule for dead-import fix</div>
+<div class="meta">Generated 2026-09-14 08:14 UTC &middot; branch <code>main</code> &middot;
+commit <code>7249a9c</code> &middot; fix(frontend): restore NEXT_PUBLIC_API_URL build arg in Dockerfile</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
+<h2>🐛 Regression Fixed: CORS/localhost:8000 on Live Site — Sep 14, 2026</h2>
+<p>The VPS redeploy above (theme-engine fix) introduced a real regression: merging <code>main</code>&#x27;s <code>frontend/Dockerfile</code> wholesale dropped the <code>ARG NEXT_PUBLIC_API_URL</code> / <code>ENV</code> wiring the old Dockerfile had. Since Next.js inlines <code>NEXT_PUBLIC_*</code> vars at <strong>build time</strong>, every component (<code>portfolio/page.tsx</code>, <code>BrokerSettings</code>, <code>LoginModal</code>, <code>HoldingsTable</code>, <code>MarketBoardPanel</code>, <code>NewsPanel</code>) silently fell back to its <code>http://localhost:8000</code> default — breaking every API call on the live site with <code>CORS policy: No &#x27;Access-Control-Allow-Origin&#x27; header</code> errors, since the browser was trying to reach <code>localhost</code> instead of <code>https://finflow.fortressintelligence.space/api</code>.</p>
+<p><strong>Fix</strong>: restored the two missing lines in <code>frontend/Dockerfile</code>&#x27;s builder stage (<code>ARG NEXT_PUBLIC_API_URL</code> + <code>ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}</code>) so <code>docker-compose.yml</code>&#x27;s existing build arg actually reaches the build. Verified locally (built bundle has zero <code>localhost:8000</code> occurrences, real URL present) and on the live container (<code>docker exec finflow-frontend grep</code> — 0 <code>localhost:8000</code>, 4 files with the correct origin) before calling it done. Pushed as <code>7249a9c</code> on <code>main</code>, redeployed to the VPS.</p>
+<p><strong>Lesson</strong>: when a merge conflict resolution replaces a whole file (not a targeted patch), diff the old and new versions for *behavior*, not just &quot;does it look more complete&quot; — the newer Dockerfile looked like a strict upgrade (multi-stage, non-root user, standalone output) but silently dropped a load-bearing build arg the old one had. Worth an explicit post-merge smoke test against the deployed environment&#x27;s actual origin, not just <code>tsc</code>/<code>build</code> succeeding.</p>
+<h2>🚀 VPS Deploy Drift Fixed: Theme Engine Now Actually Live — Sep 14, 2026</h2>
+<p>Discovered the Light/Dark toggle documented as &quot;done&quot; (see below) had never reached the live site, because three copies of the frontend had silently diverged:</p>
+<ul>
+<li><code>main</code> (git) had the real theme-engine code (<code>ThemeToggle.tsx</code>, pre-hydration</li>
+</ul>
+<p>  script, typography scale).</p>
+<ul>
+<li><code>feature/market-board-tab</code> (git) was branched before that commit and never</li>
+</ul>
+<p>  merged it — same hardcoded <code>className=&quot;dark&quot;</code> bug, no toggle.</p>
+<ul>
+<li><strong>The VPS itself (<code>/opt/FinFlow</code>) has no <code>.git</code> at all</strong> — it&#x27;s a manual</li>
+</ul>
+<p>  <code>scp</code>/file-drop deploy that had drifted from *both* branches independently,   and turned out to match <code>feature/market-board-tab</code>&#x27;s pre-merge state almost   byte-for-byte (confirmed via diff before touching anything).</p>
+<ul>
+<li>A second, unused nested copy at <code>/opt/FinFlow/Finflow/frontend/</code> (not</li>
+</ul>
+<p>  referenced by <code>docker-compose.yml</code>&#x27;s build context) added to the confusion   during investigation — left in place, harmless, but worth cleaning up.</p>
+<p><strong>Fix</strong>: merged <code>main</code> into <code>feature/market-board-tab</code> locally (real 2-parent merge — resolved 11 conflicts across <code>.env.example</code>, <code>.gitignore</code>, <code>CURRENT_STATUS.md</code>, <code>DEPLOYMENT.md</code>, <code>README.md</code>, <code>docker-compose.yml</code>, <code>frontend/Dockerfile</code>, <code>layout.tsx</code>, <code>page.tsx</code>, <code>PortfolioChart.tsx</code>, <code>lib/utils.ts</code>), keeping this branch&#x27;s auth flow (<code>LoginModal</code>, <code>BrokerSettings</code>, <code>requireAuth</code> gating) alongside <code>main</code>&#x27;s <code>ThemeToggle</code> and styling. Verified backend pytest (65/66 — see known-issue note below) and a clean frontend production build before pushing to <code>origin/feature/market-board-tab</code>. Then <code>scp</code>&#x27;d the merged frontend files to <code>/opt/FinFlow/frontend/</code> (the real build path) via a one-off SSH key set up for this session, and rebuilt the <code>frontend</code> container. Verified live: <code>finflow-theme</code> (the toggle&#x27;s localStorage key) and the &quot;Sign in&quot; button both present in the served HTML, public site returns <code>200</code>.</p>
+<p><strong>Known pre-existing issue (not caused by this work, not fixed yet)</strong>: <code>backend/tests/test_holdings.py::test_mstock_fetch_holdings_parses_and_filters_zero_qty</code> fails because its fake HTTP fixture only queues one response before the <code>ensure_session()</code> call, but that method now makes two real calls (<code>/login</code> then <code>/verifytotp</code>) since <code>ec0aa98</code>&#x27;s 502-fix. No production impact — the connector logic is correct, only the test fixture is stale.</p>
+<p><strong>Follow-up recommended, not done yet</strong>: set up a real <code>git clone</code> on the VPS so future deploys are <code>git pull &amp;&amp; rebuild</code> instead of hand-copied files — today&#x27;s whole investigation started because the server silently drifted from every git branch with no way to diff against it.</p>
+<h2>📊 Deepak&#x27;s Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026</h2>
+<p>Migrated the entire standalone market board functionality from <code>C:\Antigravity\My Bots\DadsDashboard</code> directly into FinFlow&#x27;s <code>/portfolio</code> page as a dedicated <strong>Market Board</strong> tab placed right after News:</p>
+<ul>
+<li><strong>Zero Functionality Lost</strong>:</li>
+<li>Watchlist management: loads from <code>backend/board/my_stocks.txt</code> (seeded with Dad&#x27;s 12 NSE stocks: <code>KERNEX</code>, <code>NETWEB</code>, <code>ROSSTECH</code>, <code>DATAPATTNS</code>, <code>IDEA</code>, <code>SMLMAH</code>, <code>AVALON</code>, <code>BSE</code>, <code>GVT&amp;D</code>, <code>APOLLO</code>, <code>BLUESTONE</code>, <code>MTARTECH</code>).</li>
+<li>Price &amp; Technical signals: yfinance quotes (<code>.NS</code>), Wilder&#x27;s 14-period RSI with plain-language status (<code>Oversold — looks cheap</code>, <code>Weak</code>, <code>Neutral</code>, <code>Getting expensive</code>, <code>Overbought</code>), MACD 12/26/9 histogram with momentum status (<code>Rising — momentum up</code>, <code>Positive</code>, <code>Falling — momentum down</code>, <code>Negative</code>, <code>Flat</code>).</li>
+<li>5-bucket Trend Verdict (<code>Very Bullish</code>, <code>Bullish</code>, <code>Neutral</code>, <code>Bearish</code>, <code>Very Bearish</code>) with color coding and direction arrows.</li>
+<li>Watchlist News: Google News RSS per watchlist stock, price-sensitive keyword tagging (<code>MATERIAL</code> keywords tuple -&gt; red <code>IMPORTANT</code> badge), and sentiment classification (<code>pos</code>, <code>neg</code>, <code>neu</code>). Deduplication stored via SQLite <code>seen.sqlite</code>.</li>
+<li>Add / Remove stock: Form to add NSE symbol and company name, with interactive red ✕ chips to remove stocks.</li>
+<li>Desktop export: Retained export to <code>Desktop\MarketBoard</code> (<code>board_latest.csv</code>/<code>.xlsx</code>, <code>history.csv</code>/<code>.xlsx</code>, <code>news_history.csv</code>) for local environments; gracefully disabled in headless VPS/Docker environments.</li>
+<li><strong>Backend Architecture</strong>:</li>
+<li>New modular package <code>backend/board/</code> (<code>watchlist.py</code>, <code>data.py</code>, <code>news.py</code>, <code>export.py</code>).</li>
+<li>FastAPI router <code>backend/routers/board.py</code> registered at <code>/board/</code> with <code>GET /board/</code> (in-memory cached snapshot for instant tab switching), <code>POST /board/refresh</code>, <code>POST /board/add</code>, <code>POST /board/remove</code>.</li>
+<li>15-minute background refresh job scheduled via in-process APScheduler alongside the daily trend job.</li>
+<li><strong>Frontend Architecture</strong>:</li>
+<li><code>frontend/components/portfolio/MarketBoardPanel.tsx</code>: faithful senior-readable UI matching Deepak&#x27;s Market Board with paper/cream aesthetics, large typography, indicator badges, and sources attribution table.</li>
+<li><code>frontend/app/portfolio/page.tsx</code>: updated <code>Tab</code> type to <code>&quot;summary&quot; | &quot;holdings&quot; | &quot;news&quot; | &quot;board&quot;</code>, tab list with <code>&quot;Market Board&quot;</code> placed after <code>&quot;news&quot;</code>.</li>
+<li><strong>Verification &amp; Testing</strong>:</li>
+<li>Hermetic unit tests in <code>backend/tests/test_board.py</code> with 100% offline pass rate (12/12 passed). Full test suite: 71 passed (71/71 passing).</li>
+<li>TypeScript compilation clean (<code>tsc --noEmit</code> exited with 0 errors).</li>
+<li>Next.js production build (<code>npm run build</code>) compiled successfully with static route <code>/portfolio</code>.</li>
+</ul>
+<h2>📅 mStock Holding Acquisition Dates Auto-Reconciliation (NEW) — Sep 14, 2026</h2>
+<p>Automated purchase date resolution for mStock holdings, eliminating the <code>held — set date</code> prompt:</p>
+<ul>
+<li><strong>Root Cause Solved</strong>: mStock&#x27;s <code>/portfolio/holdings</code> endpoint aggregates positions without purchase timestamps, leaving <code>first_buy_date</code> empty and requiring manual entry.</li>
+<li><strong>Session &amp; Credential Reuse</strong>: Reuses the user&#x27;s existing encrypted API credentials and active session token stored in <code>UserPlugin</code> (no extra setup or user input required).</li>
+<li><strong>FIFO Trade History Reconciliation</strong>: <code>MStockConnector</code> automatically queries <code>GET /openapi/typea/trades</code> over the prior 365 days and runs a FIFO (First-In, First-Out) matching algorithm across BUY and SELL executions to pinpoint the acquisition date of remaining open lots.</li>
+<li><strong>Automatic UI &amp; Tax Flag Activation</strong>: Persists <code>first_buy_date</code> to <code>Holding.first_buy_date</code>. The frontend automatically converts <code>held — set date</code> into the actual holding duration (e.g. <code>held 183 days</code>) and activates the &gt;365-day Long-Term Capital Gains tax flag.</li>
+<li><strong>Resilient Fallback</strong>: Gracefully falls back to standard holding sync if the trades endpoint is unavailable or trades predate the query window.</li>
+<li><strong>Tests</strong>: Verified by unit test suite in <code>backend/tests/test_mstock_dates.py</code> (100% pass).</li>
+</ul>
+<h2>☀️ / 🌙 Light &amp; Dark Mode Engine + Typography Scaling — Sep 14, 2026</h2>
+<p>Full dual-theme support and enhanced typography scale deployed to <code>main</code>:</p>
+<ul>
+<li><strong>Light Mode (White) &amp; Dark Mode Switcher</strong>: Added an interactive Sun ☀️ / Moon 🌙 toggle button (<code>frontend/components/ThemeToggle.tsx</code>) in the floating glass navigation bar. Smooth animated pill transition with active theme state. User choice is stored in <code>localStorage</code> (<code>finflow-theme</code>) and loaded via pre-hydration script in <code>layout.tsx</code> to eliminate theme flashing.</li>
+<li><strong>Adaptive Glassmorphism</strong>: In <code>frontend/app/globals.css</code>, updated CSS tokens and <code>.glass-surface</code> styling to adapt dynamically: clean slate-50/white frosted cards with <code>border-slate-200/90</code> and crisp text in Light Mode, and midnight glass in Dark Mode.</li>
+<li><strong>Increased Typography Scale</strong>: Scaled base HTML font size to <code>17.5px</code> (+15–20% boost to all rem units) and enlarged component sizes: Hero Headline (<code>text-6xl md:text-8xl lg:text-9xl</code>), Net Worth (<code>text-5xl md:text-6xl</code>), Stat Cards (<code>text-3xl font-extrabold</code>), form inputs/labels (<code>text-base</code> / <code>text-sm</code>), and chart axis (<code>14px</code>).</li>
+<li><strong>Production Docker &amp; VPS Orchestration</strong>: Added multi-stage standalone <code>frontend/Dockerfile</code>, <code>docker-compose.yml</code>, automated <code>deploy.sh</code> script, and <code>.env.example</code>.</li>
+<li><strong>Code Health</strong>: Added missing <code>frontend/lib/utils.ts</code> (<code>clsx</code> + <code>tailwind-merge</code>). Production build (<code>npm run build</code>) compiles with 0 errors.</li>
+</ul>
 <h2>⚠️ RETRACTION: neither momentum finding holds up — Sep 14, 2026</h2>
 <p>Two entries below (<strong>&quot;Strongest finding yet: sector laggards bounce back&quot;</strong> and the Nifty-relative momentum result inside <strong>&quot;Two follow-up backtests&quot;</strong>) are <strong>retracted</strong>. Both survived a first round of review but not a second, more careful one. Left in place below rather than deleted, with this notice first — showing what changed and why matters more than a clean-looking history.</p>
 <p><strong>What was wrong, found by re-reviewing the methodology (not new data):</strong> 1. <strong>Wrong null.</strong> The 55.3%/56.6%/z=-10.7 figures were compared against a    50% coin flip. The actual unconditional base rate (price up in 30 days,    this universe/window) is <strong>51.5%</strong> — the real gap was smaller than reported. 2. <strong>Absolute grading of a relative claim.</strong> &quot;Outperform Nifty&quot; is a relative    claim (beat the benchmark), but it was graded on the stock&#x27;s *absolute*    price direction, not on whether the outperformance continued. A stock can    beat a falling Nifty while falling itself — that&#x27;s not what the label    claims to predict, and it lets generic market drift masquerade as edge.    The sector-relative &quot;reversal&quot; finding&#x27;s headline evidence — hit rate    strengthening monotonically from 1d→30d — has an equally parsimonious    explanation under this bug: longer windows accumulate more drift, which    *mechanically* produces that exact monotonic shape with zero real    reversal effect required. Same bug, same illusion, both tests. 3. <strong>Overlapping samples faked the sample size.</strong> z-scores were computed as    if 2,395 daily-sampled, 30-day-forward-window rows were independent    trials. Consecutive rows share ~97% of their window. The real    independent sample size is roughly (stocks) × (non-overlapping 6-month    blocks) — on 16 stocks, about 30, not 2,395. 4. <strong>Contradicted by better prior art already in this org.</strong>    <code>TradingBot/strategies/BACKTEST_FINDINGS.md</code> §9 already ran proper    Jegadeesh-Titman 12-1 cross-sectional momentum — 48 Nifty names,    <strong>15 years</strong>, monthly (non-overlapping), 40bps single-stock cost — and it    <strong>lost to equal-weight buy-and-hold</strong> (18.2% vs 19.7% CAGR). Same factor    family, far higher rigor, already answered. This should have been found    during the original reuse-first search and wasn&#x27;t — a real miss.</p>
@@ -281,7 +347,12 @@ commit <code>14e272e</code> &middot; chore: bump Finflow submodule for dead-impo
 <li><strong>Architecture</strong>: Decoupled multi-product architecture finalized.</li>
 <li><strong>Backend</strong>: FastAPI structure with Auth, Assets, and Family modules.</li>
 <li><strong>Database</strong>: PostgreSQL schema for manual entries and portfolio aggregation. SQLite used automatically for local dev.</li>
-<li><strong>Multi-Currency</strong>: Basic FX service working for conversion and formatting.</li>
+<li><strong>Multi-Currency</strong>: FX service working for conversion and formatting (MYR, INR, USD, SGD).</li>
+<li><strong>Theme Engine</strong>: Complete <strong>Light Mode (White)</strong> and <strong>Dark Mode</strong> toggle switch with smooth animations and persistent user preference.</li>
+<li><strong>Adaptive Glassmorphism</strong>: Tailored frosted glass styling for both dark midnight and clean bright light modes.</li>
+<li><strong>Typography Scaling</strong>: Increased font size scale (+15–20% boost) across all components (Hero, Net Worth, Stat cards, inputs, charts) for effortless readability.</li>
+<li><strong>Docker &amp; VPS Deployment</strong>: Standalone production Next.js Dockerfile, FastAPI Dockerfile, multi-container <code>docker-compose.yml</code>, automated <code>deploy.sh</code> script, and <code>.env.example</code>.</li>
+<li><strong>Code Utilities</strong>: Standardized <code>cn</code> utility (<code>clsx</code> + <code>tailwind-merge</code>) resolving compilation dependencies.</li>
 <li><strong>Broker holdings backend (mStock + Zerodha)</strong>: <code>BrokerConnector</code> interface, both connectors, <code>Holding</code>/<code>UserPlugin</code> models, credential encryption, RSI/MACD/52-week price signals (free Yahoo Finance feed), plain-language tax/price flags, and <code>/holdings/*</code> API endpoints. 21 offline tests passing (<code>pytest backend/tests/ -v</code>).</li>
 <li><strong>Holdings dashboard frontend (NEW — Sep 10)</strong>: <code>Portfolio</code> modal with two tabs.</li>
 <li><strong>Summary tab</strong>: KPI tiles (current value, invested, returns, growth %), Investment-by-Sector pie, Investment-by-Capitalisation donut, Top-5-by-Investment, Invested-vs-Returns, Top-5-by-Returns, plus a Large/Mid/Small/Penny filter. Built with recharts.</li>
