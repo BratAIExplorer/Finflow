@@ -105,11 +105,14 @@ class MStockConnector(BrokerConnector):
         except httpx.HTTPError as e:
             raise BrokerConnectionError(f"mStock login failed: {e}") from e
 
-        data = payload.get("data", payload)  # some mStock responses nest under "data"
-        token = next((data[k] for k in _TOKEN_FIELD_CANDIDATES if data.get(k)), None)
+        data = payload.get("data", payload) if isinstance(payload, dict) else {}
+        if not isinstance(data, dict):
+            data = payload if isinstance(payload, dict) else {}
+        token = next((data[k] for k in _TOKEN_FIELD_CANDIDATES if isinstance(data, dict) and data.get(k)), None)
         if not token:
+            keys_info = list(data.keys()) if isinstance(data, dict) else type(data).__name__
             raise BrokerConnectionError(
-                f"mStock login succeeded but no recognizable token field in response: {list(data.keys())}"
+                f"mStock login succeeded but no recognizable token field in response: {keys_info}"
             )
 
         self.session_state = {

@@ -38,8 +38,8 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 07:51 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
-commit <code>82a2900</code> &middot; Merge origin/main into feature/market-board-tab</div>
+<div class="meta">Generated 2026-09-14 08:02 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
+commit <code>77999ea</code> &middot; chore: regenerate project-status.html after main merge</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
 <h2>📊 Deepak&#x27;s Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026</h2>
@@ -60,7 +60,7 @@ commit <code>82a2900</code> &middot; Merge origin/main into feature/market-board
 <li><code>frontend/components/portfolio/MarketBoardPanel.tsx</code>: faithful senior-readable UI matching Deepak&#x27;s Market Board with paper/cream aesthetics, large typography, indicator badges, and sources attribution table.</li>
 <li><code>frontend/app/portfolio/page.tsx</code>: updated <code>Tab</code> type to <code>&quot;summary&quot; | &quot;holdings&quot; | &quot;news&quot; | &quot;board&quot;</code>, tab list with <code>&quot;Market Board&quot;</code> placed after <code>&quot;news&quot;</code>.</li>
 <li><strong>Verification &amp; Testing</strong>:</li>
-<li>Hermetic unit tests in <code>backend/tests/test_board.py</code> with 100% offline pass rate (12/12 passed). Full test suite: 65 passed.</li>
+<li>Hermetic unit tests in <code>backend/tests/test_board.py</code> with 100% offline pass rate (12/12 passed). Full test suite: 71 passed (71/71 passing).</li>
 <li>TypeScript compilation clean (<code>tsc --noEmit</code> exited with 0 errors).</li>
 <li>Next.js production build (<code>npm run build</code>) compiled successfully with static route <code>/portfolio</code>.</li>
 </ul>

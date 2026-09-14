@@ -17,7 +17,7 @@ Migrated the entire standalone market board functionality from `C:\Antigravity\M
   - `frontend/components/portfolio/MarketBoardPanel.tsx`: faithful senior-readable UI matching Deepak's Market Board with paper/cream aesthetics, large typography, indicator badges, and sources attribution table.
   - `frontend/app/portfolio/page.tsx`: updated `Tab` type to `"summary" | "holdings" | "news" | "board"`, tab list with `"Market Board"` placed after `"news"`.
 - **Verification & Testing**:
-  - Hermetic unit tests in `backend/tests/test_board.py` with 100% offline pass rate (12/12 passed). Full test suite: 65 passed.
+  - Hermetic unit tests in `backend/tests/test_board.py` with 100% offline pass rate (12/12 passed). Full test suite: 71 passed (71/71 passing).
   - TypeScript compilation clean (`tsc --noEmit` exited with 0 errors).
   - Next.js production build (`npm run build`) compiled successfully with static route `/portfolio`.
 
