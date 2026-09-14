@@ -38,8 +38,8 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 07:38 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
-commit <code>ec0aa98</code> &middot; Fix mStock 502 Bad Gateway and 401 Unauthorized</div>
+<div class="meta">Generated 2026-09-14 07:51 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
+commit <code>82a2900</code> &middot; Merge origin/main into feature/market-board-tab</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
 <h2>📊 Deepak&#x27;s Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026</h2>
@@ -322,7 +322,12 @@ commit <code>ec0aa98</code> &middot; Fix mStock 502 Bad Gateway and 401 Unauthor
 <li><strong>Architecture</strong>: Decoupled multi-product architecture finalized.</li>
 <li><strong>Backend</strong>: FastAPI structure with Auth, Assets, and Family modules.</li>
 <li><strong>Database</strong>: PostgreSQL schema for manual entries and portfolio aggregation. SQLite used automatically for local dev.</li>
-<li><strong>Multi-Currency</strong>: Basic FX service working for conversion and formatting.</li>
+<li><strong>Multi-Currency</strong>: FX service working for conversion and formatting (MYR, INR, USD, SGD).</li>
+<li><strong>Theme Engine</strong>: Complete <strong>Light Mode (White)</strong> and <strong>Dark Mode</strong> toggle switch with smooth animations and persistent user preference.</li>
+<li><strong>Adaptive Glassmorphism</strong>: Tailored frosted glass styling for both dark midnight and clean bright light modes.</li>
+<li><strong>Typography Scaling</strong>: Increased font size scale (+15–20% boost) across all components (Hero, Net Worth, Stat cards, inputs, charts) for effortless readability.</li>
+<li><strong>Docker &amp; VPS Deployment</strong>: Standalone production Next.js Dockerfile, FastAPI Dockerfile, multi-container <code>docker-compose.yml</code>, automated <code>deploy.sh</code> script, and <code>.env.example</code>.</li>
+<li><strong>Code Utilities</strong>: Standardized <code>cn</code> utility (<code>clsx</code> + <code>tailwind-merge</code>) resolving compilation dependencies.</li>
 <li><strong>Broker holdings backend (mStock + Zerodha)</strong>: <code>BrokerConnector</code> interface, both connectors, <code>Holding</code>/<code>UserPlugin</code> models, credential encryption, RSI/MACD/52-week price signals (free Yahoo Finance feed), plain-language tax/price flags, and <code>/holdings/*</code> API endpoints. 21 offline tests passing (<code>pytest backend/tests/ -v</code>).</li>
 <li><strong>Holdings dashboard frontend (NEW — Sep 10)</strong>: <code>Portfolio</code> modal with two tabs.</li>
 <li><strong>Summary tab</strong>: KPI tiles (current value, invested, returns, growth %), Investment-by-Sector pie, Investment-by-Capitalisation donut, Top-5-by-Investment, Invested-vs-Returns, Top-5-by-Returns, plus a Large/Mid/Small/Penny filter. Built with recharts.</li>
