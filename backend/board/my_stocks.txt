@@ -1,0 +1,15 @@
+# Dad's watchlist. One per line:  NSE_SYMBOL | Full company name (used for news search)
+# Edit here or from the "My Stocks" box in the dashboard.
+
+KERNEX     | Kernex Microsystems
+NETWEB     | Netweb Technologies India
+ROSSTECH   | Rossell Techsys
+DATAPATTNS | Data Patterns India
+IDEA       | Vodafone Idea
+SMLMAH     | SML Mahindra
+AVALON     | AVALON
+BSE        | BSE
+GVT&D      | GE T&D
+APOLLO     | Apollo Micro Systems
+BLUESTONE  | Bluestone jewel
+MTARTECH   | MTARTECH

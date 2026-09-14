@@ -1,5 +1,43 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 📊 Deepak's Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026
+Migrated the entire standalone market board functionality from `C:\Antigravity\My Bots\DadsDashboard` directly into FinFlow's `/portfolio` page as a dedicated **Market Board** tab placed right after News:
+- **Zero Functionality Lost**:
+  - Watchlist management: loads from `backend/board/my_stocks.txt` (seeded with Dad's 12 NSE stocks: `KERNEX`, `NETWEB`, `ROSSTECH`, `DATAPATTNS`, `IDEA`, `SMLMAH`, `AVALON`, `BSE`, `GVT&D`, `APOLLO`, `BLUESTONE`, `MTARTECH`).
+  - Price & Technical signals: yfinance quotes (`.NS`), Wilder's 14-period RSI with plain-language status (`Oversold — looks cheap`, `Weak`, `Neutral`, `Getting expensive`, `Overbought`), MACD 12/26/9 histogram with momentum status (`Rising — momentum up`, `Positive`, `Falling — momentum down`, `Negative`, `Flat`).
+  - 5-bucket Trend Verdict (`Very Bullish`, `Bullish`, `Neutral`, `Bearish`, `Very Bearish`) with color coding and direction arrows.
+  - Watchlist News: Google News RSS per watchlist stock, price-sensitive keyword tagging (`MATERIAL` keywords tuple -> red `IMPORTANT` badge), and sentiment classification (`pos`, `neg`, `neu`). Deduplication stored via SQLite `seen.sqlite`.
+  - Add / Remove stock: Form to add NSE symbol and company name, with interactive red ✕ chips to remove stocks.
+  - Desktop export: Retained export to `Desktop\MarketBoard` (`board_latest.csv`/`.xlsx`, `history.csv`/`.xlsx`, `news_history.csv`) for local environments; gracefully disabled in headless VPS/Docker environments.
+- **Backend Architecture**:
+  - New modular package `backend/board/` (`watchlist.py`, `data.py`, `news.py`, `export.py`).
+  - FastAPI router `backend/routers/board.py` registered at `/board/` with `GET /board/` (in-memory cached snapshot for instant tab switching), `POST /board/refresh`, `POST /board/add`, `POST /board/remove`.
+  - 15-minute background refresh job scheduled via in-process APScheduler alongside the daily trend job.
+- **Frontend Architecture**:
+  - `frontend/components/portfolio/MarketBoardPanel.tsx`: faithful senior-readable UI matching Deepak's Market Board with paper/cream aesthetics, large typography, indicator badges, and sources attribution table.
+  - `frontend/app/portfolio/page.tsx`: updated `Tab` type to `"summary" | "holdings" | "news" | "board"`, tab list with `"Market Board"` placed after `"news"`.
+- **Verification & Testing**:
+  - Hermetic unit tests in `backend/tests/test_board.py` with 100% offline pass rate (12/12 passed). Full test suite: 65 passed.
+  - TypeScript compilation clean (`tsc --noEmit` exited with 0 errors).
+  - Next.js production build (`npm run build`) compiled successfully with static route `/portfolio`.
+
+## 📅 mStock Holding Acquisition Dates Auto-Reconciliation (NEW) — Sep 14, 2026
+Automated purchase date resolution for mStock holdings, eliminating the `held — set date` prompt:
+- **Root Cause Solved**: mStock's `/portfolio/holdings` endpoint aggregates positions without purchase timestamps, leaving `first_buy_date` empty and requiring manual entry.
+- **Session & Credential Reuse**: Reuses the user's existing encrypted API credentials and active session token stored in `UserPlugin` (no extra setup or user input required).
+- **FIFO Trade History Reconciliation**: `MStockConnector` automatically queries `GET /openapi/typea/trades` over the prior 365 days and runs a FIFO (First-In, First-Out) matching algorithm across BUY and SELL executions to pinpoint the acquisition date of remaining open lots.
+- **Automatic UI & Tax Flag Activation**: Persists `first_buy_date` to `Holding.first_buy_date`. The frontend automatically converts `held — set date` into the actual holding duration (e.g. `held 183 days`) and activates the >365-day Long-Term Capital Gains tax flag.
+- **Resilient Fallback**: Gracefully falls back to standard holding sync if the trades endpoint is unavailable or trades predate the query window.
+- **Tests**: Verified by unit test suite in `backend/tests/test_mstock_dates.py` (100% pass).
+
+## ☀️ / 🌙 Light & Dark Mode Engine + Typography Scaling — Sep 14, 2026
+Full dual-theme support and enhanced typography scale deployed to `main`:
+- **Light Mode (White) & Dark Mode Switcher**: Added an interactive Sun ☀️ / Moon 🌙 toggle button (`frontend/components/ThemeToggle.tsx`) in the floating glass navigation bar. Smooth animated pill transition with active theme state. User choice is stored in `localStorage` (`finflow-theme`) and loaded via pre-hydration script in `layout.tsx` to eliminate theme flashing.
+- **Adaptive Glassmorphism**: In `frontend/app/globals.css`, updated CSS tokens and `.glass-surface` styling to adapt dynamically: clean slate-50/white frosted cards with `border-slate-200/90` and crisp text in Light Mode, and midnight glass in Dark Mode.
+- **Increased Typography Scale**: Scaled base HTML font size to `17.5px` (+15–20% boost to all rem units) and enlarged component sizes: Hero Headline (`text-6xl md:text-8xl lg:text-9xl`), Net Worth (`text-5xl md:text-6xl`), Stat Cards (`text-3xl font-extrabold`), form inputs/labels (`text-base` / `text-sm`), and chart axis (`14px`).
+- **Production Docker & VPS Orchestration**: Added multi-stage standalone `frontend/Dockerfile`, `docker-compose.yml`, automated `deploy.sh` script, and `.env.example`.
+- **Code Health**: Added missing `frontend/lib/utils.ts` (`clsx` + `tailwind-merge`). Production build (`npm run build`) compiles with 0 errors.
+
 ## ⚠️ RETRACTION: neither momentum finding holds up — Sep 14, 2026
 Two entries below (**"Strongest finding yet: sector laggards bounce back"**
 and the Nifty-relative momentum result inside **"Two follow-up backtests"**)

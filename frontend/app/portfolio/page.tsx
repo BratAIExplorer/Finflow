@@ -9,6 +9,7 @@ import { LoginModal, TOKEN_KEY } from "@/components/LoginModal";
 import { SummaryPanel } from "@/components/portfolio/SummaryPanel";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
 import { NewsPanel } from "@/components/portfolio/NewsPanel";
+import { MarketBoardPanel } from "@/components/portfolio/MarketBoardPanel";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const getToken = () => (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null);
@@ -29,8 +30,13 @@ async function fetchCash(): Promise<number> {
     return data.cash_balance || 0.0;
 }
 
-type Tab = "summary" | "holdings" | "news";
-const TABS: Tab[] = ["summary", "holdings", "news"];
+type Tab = "summary" | "holdings" | "news" | "board";
+const TABS: { id: Tab; label: string }[] = [
+    { id: "summary", label: "Summary" },
+    { id: "holdings", label: "Holdings" },
+    { id: "news", label: "News" },
+    { id: "board", label: "Market Board" },
+];
 
 export default function PortfolioPage() {
     const router = useRouter();
@@ -93,13 +99,13 @@ export default function PortfolioPage() {
                 <div className="flex gap-1 mb-8 p-1 rounded-xl bg-white/5 w-fit">
                     {TABS.map((t) => (
                         <button
-                            key={t}
-                            onClick={() => setTab(t)}
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${
-                                tab === t ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+                            key={t.id}
+                            onClick={() => setTab(t.id)}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                                tab === t.id ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
                             }`}
                         >
-                            {t}
+                            {t.label}
                         </button>
                     ))}
                 </div>
@@ -120,7 +126,7 @@ export default function PortfolioPage() {
                     </div>
                 )}
 
-                {empty && tab !== "news" && (
+                {empty && tab !== "news" && tab !== "board" && (
                     <p className="text-sm text-gray-400">
                         No holdings yet. Open <strong className="text-gray-200">Plugins</strong>, add a broker account,
                         then hit <strong className="text-gray-200">Sync now</strong>.
@@ -132,6 +138,7 @@ export default function PortfolioPage() {
                 {tab === "news" && (rows.length > 0 ? <NewsPanel /> : (
                     <p className="text-sm text-gray-400">Add holdings first — news is matched to your portfolio.</p>
                 ))}
+                {tab === "board" && <MarketBoardPanel />}
             </div>
             <LoginModal
                 isOpen={showLogin}

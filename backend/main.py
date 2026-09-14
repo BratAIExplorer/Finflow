@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from .database import SessionLocal, init_db
 from .jobs.trend_snapshot import grade_pending_snapshots, snapshot_all_holdings
-from .routers import auth, assets, family, holdings, news
+from .routers import auth, assets, family, holdings, news, board
 
 IS_DEV = os.getenv("ENVIRONMENT", "production").lower() == "development"
 ALLOWED_ORIGINS = os.getenv(
@@ -28,11 +28,19 @@ def _run_daily_trend_job():
         db.close()
 
 
+def _run_board_refresh():
+    try:
+        board.refresh_board()
+    except Exception as e:
+        print(f"[board job] error: {e}")
+
+
 @app.on_event("startup")
 def on_startup():
     init_db()
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
     scheduler.add_job(_run_daily_trend_job, "cron", hour=16, minute=0)
+    scheduler.add_job(_run_board_refresh, "interval", minutes=15, id="board_refresh")
     scheduler.start()
 
 app.include_router(auth.router)
@@ -40,6 +48,7 @@ app.include_router(assets.router)
 app.include_router(family.router)
 app.include_router(holdings.router)
 app.include_router(news.router)
+app.include_router(board.router)
 
 app.add_middleware(
     CORSMiddleware,
