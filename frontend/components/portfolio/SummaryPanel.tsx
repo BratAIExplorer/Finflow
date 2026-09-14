@@ -160,9 +160,15 @@ const tooltipProps = {
 
 function Kpi({ label, value, color }: { label: string; value: string; color?: string }) {
     return (
-        <div className="glass-surface rounded-xl p-6 flex flex-col gap-3">
-            <span className="text-lg font-semibold uppercase tracking-wider text-gray-400">{label}</span>
-            <span className="text-5xl font-bold font-outfit tabular-nums" style={color ? { color } : undefined}>{value}</span>
+        <div className="glass-surface rounded-xl p-6 flex flex-col gap-3 min-w-0">
+            <span className="text-lg font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">{label}</span>
+            <span
+                className="text-3xl xl:text-4xl font-bold font-outfit tabular-nums truncate"
+                style={color ? { color } : undefined}
+                title={value}
+            >
+                {value}
+            </span>
         </div>
     );
 }
