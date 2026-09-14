@@ -1,5 +1,39 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🎯 Two follow-up backtests — one real signal found, one didn't hold up — Sep 14, 2026
+Extended `backend/tools/backtest_trend.py` with the two candidates from the
+"how would you improve accuracy" discussion, same 16-symbol/2-year data, same
+no-lookahead/direction-only methodology as the original (coin-flip) result:
+
+- **200-day moving average alignment filter** (only trust a Bullish call when
+  price is above its own 200 DMA, Bearish when below — targets RSI/MACD
+  firing against the stock's own primary trend): **mostly still noise**
+  (43–57% across cells). One cell (Bearish, 30-day, n=272) hit 56.6%, but
+  that's only ~2.2 standard deviations from a coin flip on one of many cells
+  tested — the kind of result that shows up by chance when you check enough
+  slices. Not treating it as a finding without more data.
+- **Relative momentum vs Nifty 50** (independent signal, not an RSI/MACD
+  filter: has the stock outperformed the index over the trailing ~6 months?
+  — the best-documented factor in equity research, e.g. Jegadeesh-Titman):
+  **this one is real.** Stocks that had been outperforming Nifty went on to
+  rise over the next 30 days **55.3% of the time** (n=2,395) — about
+  **5.2 standard deviations** from a 50/50 coin flip, not explainable by
+  chance at that sample size. The 1-day and 7-day windows were still ~49–52%
+  (no short-term edge — momentum is a medium-term effect, consistent with the
+  literature), and the underperform side was closer to neutral (48.5% at 30
+  days) — momentum showing up mainly on the winning side, at the horizon
+  research predicts, is what makes this look like a real effect rather than a
+  lucky cell.
+- **Conclusion**: still not touching `classify_trend()`'s live labeling logic
+  — momentum is a genuinely different signal, not a tweak to RSI/MACD, so
+  the honest next step is surfacing it as a **second, independent** data
+  point (e.g. "Outperforming Nifty by X% over 6mo") alongside the existing
+  trend label, not folding it into the same rule table. Not built yet —
+  discussing scope with the user before adding it to `Holding`/the dashboard.
+- Code: `backtest_momentum()` and the `require_sma200_alignment` gate on
+  `backtest_symbol()`, both in `backend/tools/backtest_trend.py`. Tests:
+  `backend/tests/test_backtest_trend.py` now has 11 tests (5 new).
+
 ## 🔐 Auth flow — fixed 15-min session expiry + added sign-in-from-error path — Sep 14, 2026
 Portfolio page showed "Session expired" with no way to sign back in except
 navigating away. Root cause found while fixing it: `backend/auth.py`'s

@@ -99,6 +99,58 @@ def test_summarize_hit_rate_matches_manual_count_at_scale():
     assert row["hit_rate_1d"] == round(100 * 20 / 30, 1)
 
 
+# ---------- sma200 alignment filter ----------
+
+def test_sma200_alignment_drops_misaligned_calls():
+    """A persistent downtrend sits below its own 200 DMA almost the whole way
+    down — so the filter should drop nearly every "up"-direction call it would
+    otherwise have graded (an RSI bounce mid-downtrend is exactly the whipsaw
+    case this filter targets)."""
+    n = 300
+    rng = np.random.default_rng(11)
+    closes = 200 - np.cumsum(rng.normal(0.4, 1.2, n))  # strong sustained downtrend
+    high = closes + rng.uniform(0.5, 2.0, n)
+    low = closes - rng.uniform(0.5, 2.0, n)
+    df = pd.DataFrame({"Close": closes, "High": high, "Low": low})
+
+    unfiltered = backtest_trend.backtest_symbol(df, "SYN")
+    filtered = backtest_trend.backtest_symbol(df, "SYN", require_sma200_alignment=True)
+
+    unfiltered_up = sum(1 for r in unfiltered if r["direction"] == "up")
+    filtered_up = sum(1 for r in filtered if r["direction"] == "up")
+    assert filtered_up < unfiltered_up  # the filter actually removed some misaligned "up" calls
+    assert len(filtered) <= len(unfiltered)
+
+
+def test_sma200_filter_needs_200_bars_before_grading_anything():
+    df = _synthetic_ohlc(n=100)  # fewer than 200 bars
+    filtered = backtest_trend.backtest_symbol(df, "SYN", require_sma200_alignment=True)
+    assert filtered == []  # sma200 is NaN for the whole frame, nothing can pass
+
+
+# ---------- relative momentum vs Nifty ----------
+
+def test_momentum_labels_outperform_when_stock_beats_index():
+    n = 200
+    rng = np.random.default_rng(3)
+    # stock trends up hard, index roughly flat -> stock should show Outperform
+    stock_close = 100 + np.cumsum(rng.normal(0.5, 1.0, n))
+    index_close = 100 + np.cumsum(rng.normal(0.0, 1.0, n))
+    stock_df = pd.DataFrame({"Close": stock_close}, index=pd.date_range("2024-01-01", periods=n, freq="B"))
+    index_s = pd.Series(index_close, index=stock_df.index)
+
+    rows = backtest_trend.backtest_momentum(stock_df, index_s, "SYN", lookback=60)
+    assert rows, "expected graded rows once past the lookback window"
+    assert all(r["label"] == "Outperform" for r in rows[-20:])  # late rows: momentum clearly positive by then
+
+
+def test_momentum_deadband_skips_near_zero_relative_moves():
+    n = 150
+    closes = pd.Series(100 + np.zeros(n), index=pd.date_range("2024-01-01", periods=n, freq="B"))
+    rows = backtest_trend.backtest_momentum(pd.DataFrame({"Close": closes}), closes, "FLAT", lookback=60)
+    assert rows == []  # stock == index the whole time -> relative momentum is ~0, all skipped by the deadband
+
+
 def test_summarize_computes_hit_rate_per_label():
     rows = [
         {"symbol": "A", "label": "Bullish", "direction": "up", "adx": 25,

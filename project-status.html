@@ -38,10 +38,50 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 02:02 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
-commit <code>39d6b4d</code> &middot; feat: capture trend snapshot on every manual sync, not just the daily job</div>
+<div class="meta">Generated 2026-09-14 02:22 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
+commit <code>9014414</code> &middot; fix: session expiring every 15 min, add sign-in-from-error path</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
+<h2>🎯 Two follow-up backtests — one real signal found, one didn&#x27;t hold up — Sep 14, 2026</h2>
+<p>Extended <code>backend/tools/backtest_trend.py</code> with the two candidates from the &quot;how would you improve accuracy&quot; discussion, same 16-symbol/2-year data, same no-lookahead/direction-only methodology as the original (coin-flip) result:</p>
+<ul>
+<li><strong>200-day moving average alignment filter</strong> (only trust a Bullish call when</li>
+</ul>
+<p>  price is above its own 200 DMA, Bearish when below — targets RSI/MACD   firing against the stock&#x27;s own primary trend): <strong>mostly still noise</strong>   (43–57% across cells). One cell (Bearish, 30-day, n=272) hit 56.6%, but   that&#x27;s only ~2.2 standard deviations from a coin flip on one of many cells   tested — the kind of result that shows up by chance when you check enough   slices. Not treating it as a finding without more data.</p>
+<ul>
+<li><strong>Relative momentum vs Nifty 50</strong> (independent signal, not an RSI/MACD</li>
+</ul>
+<p>  filter: has the stock outperformed the index over the trailing ~6 months?   — the best-documented factor in equity research, e.g. Jegadeesh-Titman):   <strong>this one is real.</strong> Stocks that had been outperforming Nifty went on to   rise over the next 30 days <strong>55.3% of the time</strong> (n=2,395) — about   <strong>5.2 standard deviations</strong> from a 50/50 coin flip, not explainable by   chance at that sample size. The 1-day and 7-day windows were still ~49–52%   (no short-term edge — momentum is a medium-term effect, consistent with the   literature), and the underperform side was closer to neutral (48.5% at 30   days) — momentum showing up mainly on the winning side, at the horizon   research predicts, is what makes this look like a real effect rather than a   lucky cell.</p>
+<ul>
+<li><strong>Conclusion</strong>: still not touching <code>classify_trend()</code>&#x27;s live labeling logic</li>
+</ul>
+<p>  — momentum is a genuinely different signal, not a tweak to RSI/MACD, so   the honest next step is surfacing it as a <strong>second, independent</strong> data   point (e.g. &quot;Outperforming Nifty by X% over 6mo&quot;) alongside the existing   trend label, not folding it into the same rule table. Not built yet —   discussing scope with the user before adding it to <code>Holding</code>/the dashboard.</p>
+<ul>
+<li>Code: <code>backtest_momentum()</code> and the <code>require_sma200_alignment</code> gate on</li>
+</ul>
+<p>  <code>backtest_symbol()</code>, both in <code>backend/tools/backtest_trend.py</code>. Tests:   <code>backend/tests/test_backtest_trend.py</code> now has 11 tests (5 new).</p>
+<h2>🔐 Auth flow — fixed 15-min session expiry + added sign-in-from-error path — Sep 14, 2026</h2>
+<p>Portfolio page showed &quot;Session expired&quot; with no way to sign back in except navigating away. Root cause found while fixing it: <code>backend/auth.py</code>&#x27;s <code>create_access_token()</code> defaults to a <strong>15-minute</strong> expiry when no <code>expires_delta</code> is passed, and <code>routers/auth.py</code>&#x27;s <code>login()</code> never passed one — so every login silently expired in 15 minutes regardless of the (unused) <code>ACCESS_TOKEN_EXPIRE_MINUTES</code> constant.</p>
+<ul>
+<li><strong>Fixed</strong>: <code>login()</code> now passes <code>expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)</code>;</li>
+</ul>
+<p>  the constant itself raised to 7 days (env-overridable via <code>ACCESS_TOKEN_EXPIRE_MINUTES</code>)   — this is a single-user portfolio viewer, no reason to force re-login mid-session.</p>
+<ul>
+<li><strong>Frontend</strong>: <a href="frontend/app/portfolio/page.tsx">frontend/app/portfolio/page.tsx</a> now shows</li>
+</ul>
+<p>  a &quot;Sign in&quot; button next to the expired-session message that opens the existing   <code>LoginModal</code> in place, instead of leaving the user stuck.</p>
+<ul>
+<li><strong>Password reset</strong>: no email service exists in FinFlow yet (checked — nothing</li>
+</ul>
+<p>  configured), so a real &quot;forgot password&quot; email flow wasn&#x27;t built. Added   <code>backend/tools/reset_password.py</code> instead — an admin CLI   (<code>python -m backend.tools.reset_password &lt;email&gt; &lt;new_password&gt;</code>) that resets   a password directly in the DB, no email infra needed. <code>LoginModal</code> now has a   small hint pointing to this instead of promising a self-serve reset that   doesn&#x27;t exist.</p>
+<ul>
+<li>Test: <code>backend/tests/test_auth_token_expiry.py</code> guards against the</li>
+</ul>
+<p>  expires_delta regression coming back.</p>
+<ul>
+<li><strong>Note</strong>: while testing this live, the real <code>bharatsamant@gmail.com</code> password</li>
+</ul>
+<p>  in the dev DB got overwritten by the CLI test run — reset it again if needed.</p>
 <h2>🔬 Trend label backtest — result: no measurable edge — Sep 14, 2026</h2>
 <p>Before waiting weeks for live <code>trend_snapshots</code> data to judge accuracy, ran the exact same direction-only grading logic against 2 years of real NSE history (16 liquid large/mid-caps: RELIANCE, TCS, HDFCBANK, INFY, etc.) instead — answers the &quot;is this trustworthy?&quot; question today, not in 30 days.</p>
 <ul>

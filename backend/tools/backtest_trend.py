@@ -1,4 +1,7 @@
-"""Offline backtest: how accurate is pricing.classify_trend() historically?
+"""Offline backtest: how accurate is pricing.classify_trend() historically? Also
+tests two candidate improvements raised after the first (coin-flip) result —
+a 200-day moving average regime filter, and relative momentum vs. Nifty 50 —
+using the exact same no-lookahead, direction-only methodology.
 
 Why this exists: the live trend_snapshots table (backend/jobs/trend_snapshot.py)
 answers "was this call right?" but only after waiting 1/7/30 real days per
@@ -90,15 +93,36 @@ class BacktestRow:
     adx: float | None
 
 
-def backtest_symbol(df: pd.DataFrame, symbol: str, adx_gate: float | None = None) -> list[dict]:
+def _grade_future(closes: pd.Series, i: int, n: int, price_t: float, direction: str) -> dict:
+    """Shared by every backtest variant below: hit_Nd for each window, or None
+    if the window runs past the end of the available data."""
+    out = {}
+    for w in WINDOWS:
+        if i + w >= n:
+            out[f"hit_{w}d"] = None
+            continue
+        price_future = closes.iloc[i + w]
+        hit = price_future > price_t if direction == "up" else price_future < price_t
+        out[f"hit_{w}d"] = bool(hit)  # native bool, not numpy.bool_ — object-dtype columns of
+        # numpy bools silently produce wrong .mean() results under groupby (verified: gives
+        # ~0.01 instead of ~0.45 on real data). Native Python bool avoids the landmine.
+    return out
+
+
+def backtest_symbol(df: pd.DataFrame, symbol: str, adx_gate: float | None = None,
+                     require_sma200_alignment: bool = False) -> list[dict]:
     """One row per trading day with enough lookback: the label classify_trend()
     would have given that day, plus whether price direction matched it at each
-    window. adx_gate: if set, only rows with ADX >= this are graded — this is
-    the candidate filter being evaluated against the ungated rule table."""
+    window.
+    adx_gate: if set, only rows with ADX >= this are graded (tested — no help).
+    require_sma200_alignment: if True, only grade a Bullish call when price is
+    already above its 200-day average (Bearish: below) — the idea being RSI/MACD
+    shouldn't be trusted against the stock's own primary trend."""
     closes = df["Close"]
     rsi = rsi_series(closes)
     macd = macd_hist_series(closes)
     adx = adx_series(df)
+    sma200 = closes.rolling(200).mean()
 
     rows = []
     n = len(df)
@@ -113,16 +137,63 @@ def backtest_symbol(df: pd.DataFrame, symbol: str, adx_gate: float | None = None
             continue
 
         price_t = closes.iloc[i]
-        row = {"symbol": symbol, "label": trend["label"], "direction": trend["direction"], "adx": adx.iloc[i]}
-        for w in WINDOWS:
-            if i + w >= n:
-                row[f"hit_{w}d"] = None
+        if require_sma200_alignment:
+            if pd.isna(sma200.iloc[i]):
                 continue
-            price_future = closes.iloc[i + w]
-            hit = price_future > price_t if trend["direction"] == "up" else price_future < price_t
-            row[f"hit_{w}d"] = bool(hit)  # native bool, not numpy.bool_ — object-dtype columns of
-            # numpy bools silently produce wrong .mean() results under groupby (verified: gives
-            # ~0.01 instead of ~0.45 on real data). Native Python bool avoids the landmine.
+            aligned = (trend["direction"] == "up" and price_t > sma200.iloc[i]) or \
+                      (trend["direction"] == "down" and price_t < sma200.iloc[i])
+            if not aligned:
+                continue
+
+        row = {"symbol": symbol, "label": trend["label"], "direction": trend["direction"], "adx": adx.iloc[i]}
+        row.update(_grade_future(closes, i, n, price_t, trend["direction"]))
+        rows.append(row)
+    return rows
+
+
+def fetch_index_history(symbol: str = "^NSEI", period: str = "2y") -> pd.DataFrame:
+    """Nifty 50 index history — not a tradable stock, so pricing.py's
+    NSE/.NS-suffix logic doesn't apply; fetched directly via yfinance."""
+    import yfinance as yf
+    df = yf.Ticker(symbol).history(period=period, interval="1d")
+    if df.empty:
+        raise ValueError(f"No index history found for {symbol}")
+    return df
+
+
+def backtest_momentum(df: pd.DataFrame, nifty_closes: pd.Series, symbol: str,
+                       lookback: int = 126, deadband_pct: float = 1.0) -> list[dict]:
+    """Independent signal, not a filter on classify_trend: has this stock
+    outperformed Nifty over the trailing `lookback` trading days (~6 months at
+    126)? Label Outperform/Underperform, then check the same direction-only
+    question as backtest_symbol — does relative momentum predict the stock's
+    own future price direction? deadband_pct: skip days where the relative
+    momentum is smaller than this, to avoid grading noise near zero as a call.
+    """
+    closes = df["Close"]
+    # Align stock and index on date so momentum is compared same-day-to-same-day —
+    # timezone-naive because yfinance sometimes returns tz-aware indexes for one
+    # and not the other depending on symbol/exchange.
+    idx = closes.index.tz_localize(None) if closes.index.tz is not None else closes.index
+    nidx = nifty_closes.index.tz_localize(None) if nifty_closes.index.tz is not None else nifty_closes.index
+    closes = pd.Series(closes.values, index=idx)
+    nifty = pd.Series(nifty_closes.values, index=nidx).reindex(idx, method="ffill")
+
+    stock_mom = closes / closes.shift(lookback) - 1
+    nifty_mom = nifty / nifty.shift(lookback) - 1
+    relative_mom = (stock_mom - nifty_mom) * 100  # percentage points
+
+    rows = []
+    n = len(closes)
+    for i in range(lookback + 1, n):
+        rel = relative_mom.iloc[i]
+        if pd.isna(rel) or abs(rel) < deadband_pct:
+            continue
+        direction = "up" if rel > 0 else "down"
+        label = "Outperform" if rel > 0 else "Underperform"
+        price_t = closes.iloc[i]
+        row = {"symbol": symbol, "label": label, "direction": direction, "relative_momentum_pp": round(float(rel), 1)}
+        row.update(_grade_future(closes, i, n, price_t, direction))
         rows.append(row)
     return rows
 
@@ -145,7 +216,8 @@ def summarize(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(out).sort_values("label")
 
 
-def run(symbols: list[str], adx_gate: float | None = None) -> pd.DataFrame:
+def run(symbols: list[str], adx_gate: float | None = None,
+        require_sma200_alignment: bool = False) -> pd.DataFrame:
     all_rows = []
     for symbol in symbols:
         try:
@@ -153,7 +225,22 @@ def run(symbols: list[str], adx_gate: float | None = None) -> pd.DataFrame:
         except ValueError as e:
             print(f"  skipping {symbol}: {e}", file=sys.stderr)
             continue
-        all_rows.extend(backtest_symbol(df, symbol, adx_gate=adx_gate))
+        all_rows.extend(backtest_symbol(df, symbol, adx_gate=adx_gate,
+                                         require_sma200_alignment=require_sma200_alignment))
+    return summarize(all_rows)
+
+
+def run_momentum(symbols: list[str], lookback: int = 126) -> pd.DataFrame:
+    nifty_df = fetch_index_history()
+    nifty_closes = nifty_df["Close"]
+    all_rows = []
+    for symbol in symbols:
+        try:
+            df = pricing.fetch_daily_history(symbol, "NSE", period="2y")
+        except ValueError as e:
+            print(f"  skipping {symbol}: {e}", file=sys.stderr)
+            continue
+        all_rows.extend(backtest_momentum(df, nifty_closes, symbol, lookback=lookback))
     return summarize(all_rows)
 
 
@@ -168,3 +255,9 @@ if __name__ == "__main__":
 
     print("\n=== ADX >= 20 GATE (only grade calls made during an actual trend) ===")
     print(run(symbols, adx_gate=20).to_string(index=False))
+
+    print("\n=== 200-DMA ALIGNMENT FILTER (only trust Bullish above / Bearish below 200 DMA) ===")
+    print(run(symbols, require_sma200_alignment=True).to_string(index=False))
+
+    print("\n=== RELATIVE MOMENTUM vs NIFTY 50 (independent signal, 6-month lookback) ===")
+    print(run_momentum(symbols).to_string(index=False))
