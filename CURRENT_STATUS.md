@@ -1,31 +1,38 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
-## mStock fund summary 401 fixed, token lifetime bumped to 30 days — Sep 14, 2026
-- **Symptom**: broker account showed "Never synced"; console had
-  `mStock funds fetch failed: 401 Unauthorized` on
-  `/openapi/typea/user/fundsummary`, even though the holdings sync (Type B)
-  succeeded.
-- **Root cause**: `fetch_funds()` in `backend/brokers/mstock.py` sent
-  `Authorization: token <api_key>:<token>` but not `X-PrivateKey` — every
-  other authenticated call in the file sends both. Added the missing
-  header. See `mstock_api_reference.md` for the documented Type A/B header
-  contract.
-- **Found while fixing this**: a pre-existing broken test
+## mStock fund sync fixed end-to-end, token lifetime bumped to 30 days — Sep 14, 2026
+Three real, sequential bugs in `backend/brokers/mstock.py`'s `fetch_funds()`,
+each only visible after fixing the one before it — no guessing skipped:
+1. **401 Unauthorized** on `/openapi/typea/user/fundsummary`. Missing
+   `X-PrivateKey` header — every other authenticated call in the file sends
+   it, this one didn't. See `mstock_api_reference.md` for the documented
+   Type A/B header contract.
+2. **500 crash** after the 401 was fixed. `data.get(...)` on `payload["data"]`
+   assumed a dict; the real response is a **list**. First pass made this
+   fail cleanly (400, with the real payload in `last_sync_error`) instead of
+   guessing at the shape blind.
+3. **Confirmed real shape from that error output**: `data` is a list with
+   one dict per trading segment (`SEG: "CAPITAL"`, possibly others for
+   commodity/F&O), each with its own `AVAILABLE_BALANCE`. Now sums
+   `AVAILABLE_BALANCE` across all segments for total cash. Locked in with
+   `test_mstock_fetch_funds_sums_segments_from_list_response`.
+- **Found along the way**: a pre-existing broken test
   (`test_mstock_fetch_holdings_parses_and_filters_zero_qty`) — this
   morning's earlier commit (`ec0aa98`, the 502 Bad Gateway fix) added a
   `/connect/login` call before `/verifytotp` but never updated this test's
-  mocked response queue, so it silently broke. Fixed the mock, unrelated
-  to the X-PrivateKey change. Full suite (32 tests) passes.
-- **Also today**: `ACCESS_TOKEN_EXPIRE_MINUTES` wasn't set in the VPS
-  `.env` (fell back to the 7-day default in `docker-compose.yml`). Bumped
-  to `43200` (30 days) directly in `/opt/FinFlow/.env` and restarted the
-  backend container to apply it — that file isn't in git, so this is
-  VPS-only until someone updates the documented default too.
-- **Not yet deployed to the VPS**: `mstock.py` and its test fix are
-  committed locally (`feature/ui-redesign-and-mstock-fixes`,
-  `0c5a96e`/`eb46360`) but `/opt/FinFlow` is `scp`-deployed, not
-  git-pulled — needs the file copied over and `docker compose up -d backend`
-  before the real account can re-sync.
+  mocked response queue, so it silently broke. Fixed the mock, unrelated to
+  the funds bugs. Full suite (33 tests) passes.
+- **`ACCESS_TOKEN_EXPIRE_MINUTES`** wasn't set in the VPS `.env` (fell back
+  to the 7-day default in `docker-compose.yml`). Bumped to `43200`
+  (30 days) directly in `/opt/FinFlow/.env` and restarted the backend
+  container — that file isn't in git, so this is VPS-only until someone
+  updates the documented default too.
+- **Deployed and confirmed live**: `/opt/FinFlow` is `scp` + `docker compose
+  build`-deployed, not git-pulled (a plain container restart does nothing —
+  `backend/` is baked into the image, not volume-mounted). All three fixes
+  committed on `feature/ui-redesign-and-mstock-fixes`
+  (`0c5a96e`, `eb46360`, `89c394f`, `4cfe197`), copied to the VPS, image
+  rebuilt, container recreated each time.
 
 ## ⚠️ RETRACTION: neither momentum finding holds up — Sep 14, 2026
 Two entries below (**"Strongest finding yet: sector laggards bounce back"**
