@@ -1,5 +1,32 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## mStock fund summary 401 fixed, token lifetime bumped to 30 days — Sep 14, 2026
+- **Symptom**: broker account showed "Never synced"; console had
+  `mStock funds fetch failed: 401 Unauthorized` on
+  `/openapi/typea/user/fundsummary`, even though the holdings sync (Type B)
+  succeeded.
+- **Root cause**: `fetch_funds()` in `backend/brokers/mstock.py` sent
+  `Authorization: token <api_key>:<token>` but not `X-PrivateKey` — every
+  other authenticated call in the file sends both. Added the missing
+  header. See `mstock_api_reference.md` for the documented Type A/B header
+  contract.
+- **Found while fixing this**: a pre-existing broken test
+  (`test_mstock_fetch_holdings_parses_and_filters_zero_qty`) — this
+  morning's earlier commit (`ec0aa98`, the 502 Bad Gateway fix) added a
+  `/connect/login` call before `/verifytotp` but never updated this test's
+  mocked response queue, so it silently broke. Fixed the mock, unrelated
+  to the X-PrivateKey change. Full suite (32 tests) passes.
+- **Also today**: `ACCESS_TOKEN_EXPIRE_MINUTES` wasn't set in the VPS
+  `.env` (fell back to the 7-day default in `docker-compose.yml`). Bumped
+  to `43200` (30 days) directly in `/opt/FinFlow/.env` and restarted the
+  backend container to apply it — that file isn't in git, so this is
+  VPS-only until someone updates the documented default too.
+- **Not yet deployed to the VPS**: `mstock.py` and its test fix are
+  committed locally (`feature/ui-redesign-and-mstock-fixes`,
+  `0c5a96e`/`eb46360`) but `/opt/FinFlow` is `scp`-deployed, not
+  git-pulled — needs the file copied over and `docker compose up -d backend`
+  before the real account can re-sync.
+
 ## ⚠️ RETRACTION: neither momentum finding holds up — Sep 14, 2026
 Two entries below (**"Strongest finding yet: sector laggards bounce back"**
 and the Nifty-relative momentum result inside **"Two follow-up backtests"**)
@@ -98,6 +125,99 @@ non-independence of overlapping observations (the same idea as the
   is a genuinely empty (0 bytes), stale file dated Jul 3 — harmless but
   confusing for a future session; flagging for deletion rather than
   deleting without being asked.
+
+## 📉 Sixth null result: low-volatility factor — no edge — Sep 14, 2026
+Tested whether buying the lowest-realized-volatility decile of NIFTY 50 beats
+equal-weight buy-and-hold of the same universe (the "low-volatility anomaly").
+Built with the corrected methodology from the start — non-overlapping
+quarterly rebalance periods, benchmark = equal-weight buy-and-hold of the
+same universe (not an assumed 50/50), realistic turnover cost — rather than
+repeating the overlapping-sample mistake documented above.
+
+**Result: low-vol underperformed.** 18 non-overlapping quarters, 5 years,
+48/50 NIFTY 50 symbols (`LTIM`/`TATAMOTORS` failed to fetch — stale
+tickers in `NIFTY_50`, not investigated further):
+
+| Portfolio | Avg return/quarter | Beat benchmark | Sharpe/period |
+|---|---|---|---|
+| Low-vol decile | 2.96% | 38.9% of periods | 0.39 |
+| Benchmark (equal-weight universe) | 3.62% | — | 0.47 |
+| High-vol decile | 4.75% | — | — |
+
+Paired t-stat -0.94 — not distinguishable from noise, and what signal there
+is points the *wrong* way (high-vol did best over this window). Small sample
+(18 periods) — this is "no detectable edge at this power," same caveat as
+every other test in this file, not "high-vol proven better."
+
+**Why Piotroski F-Score was deliberately NOT backtested**: it needs
+fundamentals as they were known at each historical rebalance date.
+`yfinance` only exposes a company's last ~4-5 quarters of financials as they
+stand *today* (restated), not point-in-time snapshots from past years —
+scoring 2022 with 2026's restated numbers is the same look-ahead-bias
+category of mistake as the retracted momentum result above. Rather than
+repeat that mistake, F-Score was built as **`piotroski_screen.py`** — a
+live-only screen (today's fundamentals, today's stocks, for idea generation)
+explicitly labeled as not backtested and not evidence of predictive edge.
+Honest point-in-time fundamentals would need a paid data vendor; out of
+scope until that's decided worth paying for.
+
+- Code: `backend/tools/backtest_lowvol.py` (backtest) and
+  `backend/tools/piotroski_screen.py` (live screen only). Tests: 6 new,
+  offline/synthetic, in `backend/tests/test_backtest_lowvol.py` — caught one
+  real bug during review (`_portfolio_return` crashed with `KeyError` on a
+  benchmark universe member missing from the aligned-closes dict; fixed to
+  skip rather than crash).
+
+## 💡 Ideas explored for where a real edge might still live — Sep 14, 2026
+Prompted by "RSI/MACD/momentum/low-vol are all arbitraged away — what's left
+that a retail trader can actually access?" Data-availability findings from
+checking mStock's and Kite's actual API docs (not assumed):
+
+1. **Options premium selling (IV vs. realized vol)** — the one idea here with
+   real structural backing (implied vol tends to overprice realized vol on
+   average) rather than pattern-mining hope. **Blocked on data**: mStock's
+   Option Chain API is documented but marked "*Coming Soon*" with no IV or
+   Greeks field (just strike/token/OI-count) — needs a live call with a real
+   key to confirm it even returns non-placeholder numbers before building
+   anything. Kite Connect has full historical options data incl. open
+   interest, but requires opening a *second* brokerage account (Zerodha) and
+   a **₹500/month paid plan** — real-time data and historical candles are
+   NOT in Kite's free tier (confirmed from their docs). Decision to make
+   before building: is a second broker account + subscription worth it, or
+   wait until mStock's option chain is confirmed live?
+2. **VWAP / Volume Profile** — ✅ buildable today, free, on mStock's existing
+   Intraday Chart Data endpoint (`[timestamp, O, H, L, C, volume]` per
+   minute). Caveat: that endpoint only returns *today's* candles ("only
+   current date data will be shown") — no historical intraday, so this can
+   only be forward-tested from whenever data capture starts, not
+   backtested on the past. Not yet built.
+3. **True order-flow / buy-vs-sell volume delta** — ❌ not available. mStock
+   gives total volume per candle, not bid-side vs. ask-side tagged trades.
+   Would need tick-level data with trade-direction tagging, which neither
+   mStock nor Kite's documented endpoints expose. Don't pursue.
+4. **Gamma exposure / dealer positioning** — ❌ blocked, same reason as
+   options premium above (no Greeks/OI data confirmed live yet).
+5. **News/PEAD (Post-Earnings-Announcement Drift) and sentiment divergence**
+   — plausible edge family (well-documented anomaly), but blocked on a
+   different kind of missing data: `backend/routers/news.py` is a live,
+   stateless keyword-sentiment tagger (POS/NEG word lists) with **no
+   historical archive** of (headline, forward return) pairs. Needs weeks-to-
+   months of data collection (store today's headlines + realized forward
+   returns going forward) before there's anything to backtest. Cheapest
+   first step of the five: costs nothing to start, but produces no testable
+   result quickly.
+6. **Quality/low-vol factor model** — tested (see section above), null.
+
+**Recommended next step, in order of cheapest-to-learn-something**: (a)
+confirm mStock's option chain returns real data with a live authenticated
+call — 5 minutes, resolves the biggest open question; (b) start archiving
+`news.py` output + forward returns daily, in parallel, since it costs
+nothing and the data-collection clock only starts once begun; (c) build VWAP
+deviation signals on mStock's live intraday feed for forward-paper-testing.
+Do not open a Kite/Zerodha account or start any options-selling
+implementation before (a) is confirmed and until explicit position-sizing/
+tail-risk limits are decided — this is real-money risk, not a backtest
+decision.
 
 ## 🏆 RETRACTED — Strongest finding yet: sector laggards bounce back — Sep 14, 2026
 Continued digging for signals after the Nifty-relative momentum result.
@@ -415,6 +535,9 @@ Live-tested against the deployed VPS, not just read from source:
 
 ## 💡 Ecosystem Note
 The **ARUN Trading Bot** is now a separate standalone project. FinFlow will eventually integrate with it via a read-only database connection to show "Bot Managed" assets in the total net worth view.
+
+**Quantitative Research / Backtesting (Sep 14, 2026):**
+All quantitative research, backtesting scripts, and strategy validation logic (previously in `FinFlow` and `TradingBot`) have been migrated to a centralized repository at `C:\Antigravity\Backtesting`. This serves as the single source of truth for backtesting going forward.
 
 ### Recent Updates (Sep 13, 2026)
 - **UI/UX Refinements**: Enlarged fonts across the Summary panel and made the UI more senior-citizen friendly. Simplified owner name displays (e.g. converting emails to first names).
