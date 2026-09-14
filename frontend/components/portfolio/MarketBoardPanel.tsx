@@ -142,21 +142,21 @@ export function MarketBoardPanel() {
 
     if (loading) {
         return (
-            <div className="flex items-center gap-3 py-16 text-slate-300">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-                <span className="text-lg">Loading Deepak&apos;s Market Board…</span>
+            <div className="flex items-center gap-4 py-20 text-slate-300">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+                <span className="text-2xl font-medium">Loading Deepak&apos;s Market Board…</span>
             </div>
         );
     }
 
     if (error && !snap) {
         return (
-            <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300">
-                <p className="font-bold text-lg mb-2">Could not load Market Board</p>
-                <p className="text-sm opacity-90">{error}</p>
+            <div className="p-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300">
+                <p className="font-bold text-2xl mb-3">Could not load Market Board</p>
+                <p className="text-lg opacity-90">{error}</p>
                 <button
                     onClick={loadBoard}
-                    className="mt-4 px-4 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-sm font-semibold transition-colors"
+                    className="mt-6 px-6 py-3 rounded-lg text-lg font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 transition-colors"
                 >
                     Retry
                 </button>
@@ -171,38 +171,38 @@ export function MarketBoardPanel() {
             {/* Top Bar */}
             <header className="flex flex-wrap items-end justify-between gap-4 pb-6 border-b-2 border-[#1A1A1A]">
                 <div>
-                    <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-[#1A1A1A]">
+                    <h1 className="text-5xl md:text-6xl font-serif font-bold tracking-tight text-[#1A1A1A]">
                         Deepak&apos;s Market Board
                     </h1>
                 </div>
-                <div className="text-2xl md:text-3xl font-bold font-mono tracking-tight text-[#1A1A1A]">
+                <div className="text-3xl md:text-4xl font-bold font-mono tracking-tight text-[#1A1A1A]">
                     {snap.ts}
                 </div>
 
-                <div className="w-full flex flex-wrap items-center gap-4 md:gap-6 text-base md:text-lg text-[#5B5750] pt-2">
+                <div className="w-full flex flex-wrap items-center gap-5 md:gap-8 text-lg md:text-xl text-[#5B5750] pt-3">
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing || actionLoading}
-                        className="bg-[#123B6D] hover:bg-[#0e2c52] text-white font-bold text-lg px-6 py-2.5 rounded-xl shadow-md transition-all active:translate-y-0.5 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="bg-[#123B6D] hover:bg-[#0e2c52] text-white font-bold text-lg px-7 py-3 rounded-xl shadow-md transition-all active:translate-y-0.5 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                     >
-                        {refreshing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                        {refreshing ? <Loader2 className="w-6 h-6 animate-spin" /> : <RefreshCw className="w-6 h-6" />}
                         Refresh now
                     </button>
 
-                    <span>Last updated {snap.ts}</span>
+                    <span className="font-medium">Last updated {snap.ts}</span>
 
-                    <span className="inline-flex items-center gap-2 font-semibold">
+                    <span className="inline-flex items-center gap-2 font-semibold text-lg">
                         <span
-                            className={`w-3.5 h-3.5 rounded-full ${
+                            className={`w-4 h-4 rounded-full ${
                                 snap.prices_ok ? "bg-[#00A651]" : "bg-[#E4002B]"
                             }`}
                         />
                         Prices {snap.prices_ok ? "working" : "problem"}
                     </span>
 
-                    <span className="inline-flex items-center gap-2 font-semibold">
+                    <span className="inline-flex items-center gap-2 font-semibold text-lg">
                         <span
-                            className={`w-3.5 h-3.5 rounded-full ${
+                            className={`w-4 h-4 rounded-full ${
                                 snap.news_ok ? "bg-[#00A651]" : "bg-[#E4002B]"
                             }`}
                         />
@@ -210,7 +210,7 @@ export function MarketBoardPanel() {
                     </span>
 
                     {snap.out_dir && (
-                        <span className="truncate max-w-md">Files saved to {snap.out_dir}</span>
+                        <span className="truncate max-w-md font-medium">Files saved to {snap.out_dir}</span>
                     )}
                 </div>
             </header>
@@ -219,16 +219,16 @@ export function MarketBoardPanel() {
             <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-8 mt-8">
                 {/* Left Column: Stocks */}
                 <section>
-                    <h2 className="text-2xl md:text-3xl font-serif font-bold mb-1 text-[#1A1A1A]">
+                    <h2 className="text-4xl md:text-5xl font-serif font-bold mb-3 text-[#1A1A1A]">
                         My stocks — how they look today
                     </h2>
-                    <p className="text-base md:text-lg text-[#5B5750] mb-6">
+                    <p className="text-lg md:text-xl text-[#5B5750] mb-8 font-medium">
                         Big word = the direction. Green going up, red going down.
                     </p>
 
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                         {snap.stocks.length === 0 ? (
-                            <p className="p-6 bg-white rounded-2xl border border-[#E7DFCF] text-[#5B5750]">
+                            <p className="p-8 bg-white rounded-2xl border-2 border-[#E7DFCF] text-[#5B5750] text-xl font-medium">
                                 No stocks yet — add some on the right.
                             </p>
                         ) : (
@@ -244,26 +244,26 @@ export function MarketBoardPanel() {
                                 return (
                                     <article
                                         key={s.symbol}
-                                        className="bg-white border-2 border-[#E7DFCF] rounded-2xl p-5 md:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                                        className="bg-white border-2 border-[#E7DFCF] rounded-2xl p-6 md:p-7 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5"
                                     >
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                <span className="text-2xl font-serif font-bold text-[#1A1A1A]">
+                                            <div className="flex items-center gap-3 flex-wrap mb-2">
+                                                <span className="text-3xl font-serif font-bold text-[#1A1A1A]">
                                                     {s.name}
                                                 </span>
-                                                <span className="text-xs font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#EDEAE2] text-[#6b6355] border border-[#E7DFCF]">
+                                                <span className="text-sm font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-md bg-[#EDEAE2] text-[#6b6355] border border-[#E7DFCF]">
                                                     Watching only
                                                 </span>
                                             </div>
 
-                                            <div className="text-sm font-semibold tracking-wider text-[#5B5750] uppercase mb-1">
+                                            <div className="text-lg font-semibold tracking-wider text-[#5B5750] uppercase mb-2">
                                                 {s.symbol}
                                             </div>
 
-                                            <div className="flex items-baseline gap-3 mb-2 font-mono">
-                                                <span className="text-2xl font-bold text-[#1A1A1A]">{s.price}</span>
+                                            <div className="flex items-baseline gap-4 mb-3 font-mono">
+                                                <span className="text-3xl font-bold text-[#1A1A1A]">{s.price}</span>
                                                 <span
-                                                    className={`text-lg font-bold ${
+                                                    className={`text-2xl font-bold ${
                                                         s.dir === "up" ? "text-[#00A651]" : "text-[#E4002B]"
                                                     }`}
                                                 >
@@ -271,14 +271,14 @@ export function MarketBoardPanel() {
                                                 </span>
                                             </div>
 
-                                            <div className="text-sm text-[#5B5750] font-medium mb-3">
+                                            <div className="text-lg text-[#5B5750] font-medium mb-4">
                                                 Not bought — on the list to watch{" "}
                                                 <em className="text-slate-400">(holdings come in Phase 1)</em>
                                             </div>
 
-                                            <div className="flex flex-wrap gap-2.5">
-                                                <span className="inline-flex items-center gap-1.5 bg-[#FBF7EF] border border-[#E7DFCF] rounded-lg px-3 py-1 text-sm font-semibold text-[#1A1A1A]">
-                                                    RSI <b className="font-mono">{s.rsi}</b>{" "}
+                                            <div className="flex flex-wrap gap-3">
+                                                <span className="inline-flex items-center gap-2 bg-[#FBF7EF] border border-[#E7DFCF] rounded-lg px-4 py-2 text-base font-semibold text-[#1A1A1A]">
+                                                    RSI <b className="font-mono text-lg">{s.rsi}</b>{" "}
                                                     <span
                                                         className={
                                                             s.rsiW[1] === "good"
@@ -292,7 +292,7 @@ export function MarketBoardPanel() {
                                                     </span>
                                                 </span>
 
-                                                <span className="inline-flex items-center gap-1.5 bg-[#FBF7EF] border border-[#E7DFCF] rounded-lg px-3 py-1 text-sm font-semibold text-[#1A1A1A]">
+                                                <span className="inline-flex items-center gap-2 bg-[#FBF7EF] border border-[#E7DFCF] rounded-lg px-4 py-2 text-base font-semibold text-[#1A1A1A]">
                                                     MACD{" "}
                                                     <span
                                                         className={
@@ -311,12 +311,12 @@ export function MarketBoardPanel() {
 
                                         {/* Big Verdict badge */}
                                         <div
-                                            className={`shrink-0 text-center md:text-right p-4 rounded-xl min-w-[140px] font-serif ${verdictBg}`}
+                                            className={`shrink-0 text-center md:text-right p-5 rounded-xl min-w-[160px] font-serif ${verdictBg}`}
                                         >
-                                            <div className="text-2xl md:text-3xl font-bold leading-none">
+                                            <div className="text-4xl md:text-5xl font-bold leading-none">
                                                 {s.verdict.big}
                                             </div>
-                                            <small className="block font-sans text-xs font-semibold opacity-80 mt-1">
+                                            <small className="block font-sans text-sm font-semibold opacity-80 mt-2">
                                                 {s.verdict.sub}
                                             </small>
                                         </div>
@@ -330,55 +330,55 @@ export function MarketBoardPanel() {
                 {/* Right Column: Add/Remove + News */}
                 <section>
                     {/* Add / Remove Box */}
-                    <div className="bg-white border-2 border-dashed border-[#123B6D] rounded-2xl p-6 mb-8">
-                        <h2 className="text-xl md:text-2xl font-serif font-bold text-[#1A1A1A] mb-1">
+                    <div className="bg-white border-2 border-dashed border-[#123B6D] rounded-2xl p-8 mb-8">
+                        <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#1A1A1A] mb-2">
                             My stocks — add or remove
                         </h2>
-                        <p className="text-sm text-[#5B5750] mb-4">
+                        <p className="text-lg text-[#5B5750] mb-6 font-medium">
                             Type an NSE symbol and a name, press <strong>Add</strong>. Red ✕ removes.
                         </p>
 
-                        <form onSubmit={handleAdd} className="flex flex-wrap gap-2.5 mb-5">
+                        <form onSubmit={handleAdd} className="flex flex-wrap gap-3 mb-6">
                             <input
                                 value={symbol}
                                 onChange={(e) => setSymbol(e.target.value)}
                                 placeholder="Symbol e.g. TATAPOWER"
                                 aria-label="NSE symbol"
                                 required
-                                className="flex-1 min-w-[140px] bg-[#FBF7EF] border-2 border-[#E7DFCF] rounded-xl px-4 py-2.5 text-base font-medium text-[#1A1A1A] focus:outline-none focus:border-[#123B6D]"
+                                className="flex-1 min-w-[140px] bg-[#FBF7EF] border-2 border-[#E7DFCF] rounded-xl px-5 py-3 text-lg font-medium text-[#1A1A1A] focus:outline-none focus:border-[#123B6D]"
                             />
                             <input
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Name e.g. Tata Power"
                                 aria-label="Company name"
-                                className="flex-1 min-w-[140px] bg-[#FBF7EF] border-2 border-[#E7DFCF] rounded-xl px-4 py-2.5 text-base font-medium text-[#1A1A1A] focus:outline-none focus:border-[#123B6D]"
+                                className="flex-1 min-w-[140px] bg-[#FBF7EF] border-2 border-[#E7DFCF] rounded-xl px-5 py-3 text-lg font-medium text-[#1A1A1A] focus:outline-none focus:border-[#123B6D]"
                             />
                             <button
                                 type="submit"
                                 disabled={actionLoading}
-                                className="bg-[#00A651] hover:bg-[#008f45] text-white font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-sm transition-all disabled:opacity-50"
+                                className="bg-[#00A651] hover:bg-[#008f45] text-white font-bold text-lg px-7 py-3 rounded-xl cursor-pointer shadow-sm transition-all disabled:opacity-50"
                             >
                                 Add
                             </button>
                         </form>
 
-                        <div className="text-xs font-extrabold uppercase tracking-wider text-[#5B5750] mb-3">
+                        <div className="text-sm font-extrabold uppercase tracking-wider text-[#5B5750] mb-4">
                             Your stocks — tap the red ✕ to remove
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-3">
                             {snap.stocks.map((s) => (
                                 <span
                                     key={s.symbol}
-                                    className="inline-flex items-center gap-2 bg-[#FBF7EF] border-2 border-[#E7DFCF] rounded-full pl-3.5 pr-1.5 py-1 text-sm font-bold text-[#1A1A1A]"
+                                    className="inline-flex items-center gap-2 bg-[#FBF7EF] border-2 border-[#E7DFCF] rounded-full pl-4 pr-2 py-1.5 text-base font-bold text-[#1A1A1A]"
                                 >
                                     {s.symbol}
                                     <button
                                         onClick={() => handleRemove(s.symbol)}
                                         disabled={actionLoading}
                                         aria-label={`Remove ${s.symbol}`}
-                                        className="w-6 h-6 rounded-full bg-[#E4002B] hover:bg-[#c90025] text-white flex items-center justify-center text-xs font-bold cursor-pointer transition-colors"
+                                        className="w-7 h-7 rounded-full bg-[#E4002B] hover:bg-[#c90025] text-white flex items-center justify-center text-sm font-bold cursor-pointer transition-colors"
                                     >
                                         ✕
                                     </button>
@@ -389,22 +389,22 @@ export function MarketBoardPanel() {
 
                     {/* Latest Company News */}
                     <div className="bg-white border-2 border-[#E7DFCF] rounded-2xl shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-[#E7DFCF]">
-                            <h2 className="text-xl md:text-2xl font-serif font-bold text-[#1A1A1A] mb-1">
+                        <div className="p-8 border-b border-[#E7DFCF]">
+                            <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#1A1A1A] mb-2">
                                 Latest company news
                             </h2>
-                            <p className="text-sm text-[#5B5750]">
+                            <p className="text-lg text-[#5B5750] font-medium">
                                 Newest first. A red{" "}
-                                <span className="bg-[#E4002B] text-white font-bold text-xs px-2 py-0.5 rounded">
+                                <span className="bg-[#E4002B] text-white font-bold text-sm px-2 py-1 rounded">
                                     IMPORTANT
                                 </span>{" "}
                                 tag means a price-sensitive word (order, results, pledge...).
                             </p>
                         </div>
 
-                        <div className="divide-y divide-[#E7DFCF] max-h-[620px] overflow-y-auto">
+                        <div className="divide-y divide-[#E7DFCF] max-h-[700px] overflow-y-auto">
                             {snap.news.length === 0 ? (
-                                <div className="p-6 text-sm text-[#5B5750]">
+                                <div className="p-8 text-lg text-[#5B5750] font-medium">
                                     No news pulled yet. It refreshes about once an hour.
                                 </div>
                             ) : (
@@ -416,13 +416,13 @@ export function MarketBoardPanel() {
                                             ? "border-l-8 border-[#E4002B]"
                                             : "border-l-8 border-[#F59E00]";
                                     return (
-                                        <div key={n.id} className={`p-4 md:p-5 ${borderClass} hover:bg-slate-50 transition-colors`}>
-                                            <div className="text-base md:text-lg font-semibold text-[#1A1A1A] leading-snug mb-2">
+                                        <div key={n.id} className={`p-5 md:p-6 ${borderClass} hover:bg-slate-50 transition-colors`}>
+                                            <div className="text-lg md:text-xl font-semibold text-[#1A1A1A] leading-snug mb-3">
                                                 {n.head}
                                             </div>
-                                            <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm text-[#5B5750]">
+                                            <div className="flex flex-wrap items-center gap-3 text-sm md:text-base text-[#5B5750]">
                                                 {n.important && (
-                                                    <span className="bg-[#E4002B] text-white font-bold px-2 py-0.5 rounded text-[11px] uppercase tracking-wider">
+                                                    <span className="bg-[#E4002B] text-white font-bold px-3 py-1 rounded text-sm uppercase tracking-wider">
                                                         IMPORTANT
                                                     </span>
                                                 )}
@@ -440,50 +440,50 @@ export function MarketBoardPanel() {
             </div>
 
             {/* Sources Table */}
-            <section className="mt-10 bg-white border-2 border-[#E7DFCF] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-xl md:text-2xl font-serif font-bold text-[#1A1A1A] mb-4">
+            <section className="mt-12 bg-white border-2 border-[#E7DFCF] rounded-2xl p-8 shadow-sm">
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#1A1A1A] mb-6">
                     Where this data comes from
                 </h2>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm md:text-base border-collapse">
+                    <table className="w-full text-left text-lg md:text-xl border-collapse">
                         <thead>
-                            <tr className="border-b-2 border-[#E7DFCF] text-xs font-bold uppercase tracking-wider text-[#5B5750]">
-                                <th className="pb-3 pr-4">What you see</th>
-                                <th className="pb-3 pr-4">Source</th>
-                                <th className="pb-3 pr-4">Cost</th>
-                                <th className="pb-3">How fresh</th>
+                            <tr className="border-b-2 border-[#E7DFCF] text-sm font-bold uppercase tracking-wider text-[#5B5750]">
+                                <th className="pb-4 pr-4">What you see</th>
+                                <th className="pb-4 pr-4">Source</th>
+                                <th className="pb-4 pr-4">Cost</th>
+                                <th className="pb-4">How fresh</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#E7DFCF]">
                             <tr>
-                                <td className="py-3 pr-4 font-medium">Trend word, price, day change</td>
-                                <td className="py-3 pr-4">Yahoo Finance (yfinance), NSE prices</td>
-                                <td className="py-3 pr-4 text-[#00A651] font-bold">Free</td>
-                                <td className="py-3 text-[#5B5750]">Every 15 min (~15 min delayed)</td>
+                                <td className="py-4 pr-4 font-medium">Trend word, price, day change</td>
+                                <td className="py-4 pr-4">Yahoo Finance (yfinance), NSE prices</td>
+                                <td className="py-4 pr-4 text-[#00A651] font-bold">Free</td>
+                                <td className="py-4 text-[#5B5750]">Every 15 min (~15 min delayed)</td>
                             </tr>
                             <tr>
-                                <td className="py-3 pr-4 font-medium">RSI &amp; MACD</td>
-                                <td className="py-3 pr-4">Worked out from price history (TradingView formulas)</td>
-                                <td className="py-3 pr-4 text-[#00A651] font-bold">Free</td>
-                                <td className="py-3 text-[#5B5750]">Every 15 min</td>
+                                <td className="py-4 pr-4 font-medium">RSI &amp; MACD</td>
+                                <td className="py-4 pr-4">Worked out from price history (TradingView formulas)</td>
+                                <td className="py-4 pr-4 text-[#00A651] font-bold">Free</td>
+                                <td className="py-4 text-[#5B5750]">Every 15 min</td>
                             </tr>
                             <tr>
-                                <td className="py-3 pr-4 font-medium">Company news</td>
-                                <td className="py-3 pr-4">Google News (Moneycontrol, Economic Times, BQ Prime)</td>
-                                <td className="py-3 pr-4 text-[#00A651] font-bold">Free</td>
-                                <td className="py-3 text-[#5B5750]">Every hour</td>
+                                <td className="py-4 pr-4 font-medium">Company news</td>
+                                <td className="py-4 pr-4">Google News (Moneycontrol, Economic Times, BQ Prime)</td>
+                                <td className="py-4 pr-4 text-[#00A651] font-bold">Free</td>
+                                <td className="py-4 text-[#5B5750]">Every hour</td>
                             </tr>
                             <tr>
-                                <td className="py-3 pr-4 font-medium">NSE/BSE official filings</td>
-                                <td className="py-3 pr-4"><em>Backlog</em> — added in the next step</td>
-                                <td className="py-3 pr-4 text-[#00A651] font-bold">Free</td>
-                                <td className="py-3 text-[#5B5750]">—</td>
+                                <td className="py-4 pr-4 font-medium">NSE/BSE official filings</td>
+                                <td className="py-4 pr-4"><em>Backlog</em> — added in the next step</td>
+                                <td className="py-4 pr-4 text-[#00A651] font-bold">Free</td>
+                                <td className="py-4 text-[#5B5750]">—</td>
                             </tr>
                             <tr>
-                                <td className="py-3 pr-4 font-medium">Positions &amp; profit/loss</td>
-                                <td className="py-3 pr-4"><em>Phase 1</em> — 2 Zerodha + 1 mStock</td>
-                                <td className="py-3 pr-4 text-[#5B5750]">Zerodha ~₹500/mo each</td>
-                                <td className="py-3 text-[#5B5750]">Every 15 min</td>
+                                <td className="py-4 pr-4 font-medium">Positions &amp; profit/loss</td>
+                                <td className="py-4 pr-4"><em>Phase 1</em> — 2 Zerodha + 1 mStock</td>
+                                <td className="py-4 pr-4 text-[#5B5750]">Zerodha ~₹500/mo each</td>
+                                <td className="py-4 text-[#5B5750]">Every 15 min</td>
                             </tr>
                         </tbody>
                     </table>
@@ -491,7 +491,7 @@ export function MarketBoardPanel() {
             </section>
 
             {/* Footnote */}
-            <p className="mt-8 text-center text-sm text-[#5B5750] border-t border-[#E7DFCF] pt-4">
+            <p className="mt-10 text-center text-lg text-[#5B5750] border-t border-[#E7DFCF] pt-6 font-medium">
                 Phase 0 — trend + news only.{" "}
                 {snap.out_dir && (
                     <>

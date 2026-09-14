@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:is(.dark, .dark *));
 
 @theme {
   --color-border: hsl(var(--border));
@@ -122,7 +122,7 @@
 
 @layer base {
   html {
-    font-size: 17.5px; /* Enhanced base font size (+10-15%) for both light & dark modes */
+    font-size: 20px; /* Senior-citizen optimized font size for maximum readability */
   }
 
   * {
@@ -133,6 +133,32 @@
     @apply bg-background text-foreground antialiased selection:bg-indigo-500/30;
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: background-color 0.3s ease, color 0.3s ease;
+    letter-spacing: 0.4px;
+    line-height: 1.6;
+  }
+
+  h1 {
+    @apply text-5xl font-bold tracking-tight mb-3 leading-tight;
+  }
+
+  h2 {
+    @apply text-4xl font-bold tracking-tight mb-3 leading-tight;
+  }
+
+  h3 {
+    @apply text-3xl font-bold tracking-tight mb-2 leading-tight;
+  }
+
+  h4 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  p {
+    @apply leading-relaxed text-lg;
+  }
+
+  button {
+    @apply text-lg font-medium transition-all duration-200;
   }
 }
 

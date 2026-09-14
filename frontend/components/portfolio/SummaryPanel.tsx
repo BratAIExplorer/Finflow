@@ -54,18 +54,18 @@ export function SummaryPanel({ rows, cash = 0 }: { rows: Holding[], cash?: numbe
     const topReturns = topByReturns(filtered);
     const investVsReturns = topInvest.map((d) => ({ name: d.name, Invested: Math.round(d.invested), Returns: Math.round(d.returns) }));
 
-    const chartFallback = <div className="h-[230px] flex items-center justify-center text-base text-gray-600">Loading chart…</div>;
+    const chartFallback = <div className="h-[230px] flex items-center justify-center text-xl text-gray-500 font-medium">Loading chart…</div>;
 
     return (
         <div className="flex flex-col gap-5">
             {/* Cap-tier filter always visible */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
                 {["All", ...CAP_TIERS].map((t) => (
                     <button
                         key={t}
                         onClick={() => setTier(t)}
-                        className={`px-4 py-2 rounded-lg text-lg font-semibold transition-colors ${
-                            tier === t ? "bg-indigo-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"
+                        className={`px-6 py-3 rounded-lg text-lg font-semibold transition-all duration-200 ${
+                            tier === t ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
                         }`}
                     >
                         {t}
@@ -74,11 +74,11 @@ export function SummaryPanel({ rows, cash = 0 }: { rows: Holding[], cash?: numbe
             </div>
 
             {filtered.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-white/10">
-                    <p className="text-xl text-gray-400 mb-6">No holdings in the {tier} bucket.</p>
-                    <button 
+                <div className="py-16 flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-white/10">
+                    <p className="text-2xl text-gray-300 mb-8 font-semibold">No holdings in the {tier} bucket.</p>
+                    <button
                         onClick={() => setTier("All")}
-                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors shadow-lg"
+                        className="px-8 py-4 text-lg bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all duration-200 shadow-lg hover:shadow-xl"
                     >
                         ← Back to All Holdings
                     </button>
@@ -97,15 +97,15 @@ export function SummaryPanel({ rows, cash = 0 }: { rows: Holding[], cash?: numbe
             {/* Row: sector pie · cap donut · top 5 invested */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className={CARD}>
-                    <h3 className="text-xl font-bold text-gray-300 mb-2">Investment by Sector</h3>
+                    <h3 className="text-2xl font-bold text-gray-200 mb-4">Investment by Sector</h3>
                     {ready ? <SlicePie data={sectors} innerRadius={0} /> : chartFallback}
                 </div>
                 <div className={CARD}>
-                    <h3 className="text-xl font-bold text-gray-300 mb-2">Investment by Capitalization</h3>
+                    <h3 className="text-2xl font-bold text-gray-200 mb-4">Investment by Capitalization</h3>
                     {ready ? <SlicePie data={caps} innerRadius={55} /> : chartFallback}
                 </div>
                 <div className={CARD}>
-                    <h3 className="text-xl font-bold text-gray-300 mb-2">Top 5 Companies by Investment</h3>
+                    <h3 className="text-2xl font-bold text-gray-200 mb-4">Top 5 Companies by Investment</h3>
                     {ready ? <RankBar data={topInvest.map((d) => ({ name: d.name, value: Math.round(d.invested) }))} color="#6366f1" /> : chartFallback}
                 </div>
             </div>
@@ -113,12 +113,12 @@ export function SummaryPanel({ rows, cash = 0 }: { rows: Holding[], cash?: numbe
             {/* Row: invested vs returns · top 5 returns */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className={CARD}>
-                    <h3 className="text-xl font-bold text-gray-300 mb-2">Invested vs Returns</h3>
+                    <h3 className="text-2xl font-bold text-gray-200 mb-4">Invested vs Returns</h3>
                     {!ready ? chartFallback : (
                     <ResponsiveContainer width="100%" height={240} minWidth={1} minHeight={1}>
                         <BarChart data={investVsReturns} layout="vertical" margin={{ left: 20, right: 24 }}>
                             <XAxis type="number" hide />
-                            <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#9ca3af", fontSize: 14 }} axisLine={false} tickLine={false} />
+                            <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#9ca3af", fontSize: 16 }} axisLine={false} tickLine={false} />
                             <Tooltip {...tooltipProps} />
                             <Bar isAnimationActive={false} dataKey="Invested" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={14} />
                             <Bar isAnimationActive={false} dataKey="Returns" fill="#34d399" radius={[0, 4, 4, 0]} barSize={14} />
@@ -127,18 +127,18 @@ export function SummaryPanel({ rows, cash = 0 }: { rows: Holding[], cash?: numbe
                     )}
                 </div>
                 <div className={CARD}>
-                    <h3 className="text-xl font-bold text-gray-300 mb-2">Top 5 Companies by Returns</h3>
+                    <h3 className="text-2xl font-bold text-gray-200 mb-4">Top 5 Companies by Returns</h3>
                     {!ready ? chartFallback : (
                     <ResponsiveContainer width="100%" height={240} minWidth={1} minHeight={1}>
                         <BarChart data={topReturns.map((d) => ({ name: d.name, value: Math.round(d.returns) }))} margin={{ top: 16, left: 4, right: 4 }}>
-                            <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 14 }} axisLine={false} tickLine={false} interval={0} />
+                            <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 16 }} axisLine={false} tickLine={false} interval={0} />
                             <YAxis hide />
                             <Tooltip {...tooltipProps} />
                             <Bar isAnimationActive={false} dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
                                 {topReturns.map((d, i) => (
                                     <Cell key={i} fill={d.returns >= 0 ? "#34d399" : "#fb7185"} />
                                 ))}
-                                <LabelList dataKey="value" position="top" formatter={money} style={{ fill: "#9ca3af", fontSize: 14 }} />
+                                <LabelList dataKey="value" position="top" formatter={money} style={{ fill: "#9ca3af", fontSize: 16 }} />
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
@@ -160,9 +160,9 @@ const tooltipProps = {
 
 function Kpi({ label, value, color }: { label: string; value: string; color?: string }) {
     return (
-        <div className="glass-surface rounded-xl p-5 flex flex-col gap-2">
-            <span className="text-base font-semibold uppercase tracking-wider text-gray-400">{label}</span>
-            <span className="text-4xl font-bold font-outfit tabular-nums" style={color ? { color } : undefined}>{value}</span>
+        <div className="glass-surface rounded-xl p-6 flex flex-col gap-3">
+            <span className="text-lg font-semibold uppercase tracking-wider text-gray-400">{label}</span>
+            <span className="text-5xl font-bold font-outfit tabular-nums" style={color ? { color } : undefined}>{value}</span>
         </div>
     );
 }

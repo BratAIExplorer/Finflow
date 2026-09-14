@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -33,17 +33,21 @@ export default function RootLayout({
                   var saved = localStorage.getItem('finflow-theme');
                   if (saved === 'light') {
                     document.documentElement.classList.remove('dark');
+                    document.documentElement.classList.add('light');
                   } else {
                     document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
                   }
-                } catch (e) {}
+                } catch (e) {
+                  document.documentElement.classList.add('dark');
+                }
               })();
             `,
           }}
         />
       </head>
       <body
-        className={`${inter.variable} ${outfit.variable} font-inter antialiased tracking-normal bg-background text-foreground`}
+        className={`${inter.variable} ${outfit.variable} font-inter antialiased tracking-normal bg-background text-foreground transition-colors duration-300`}
       >
         {children}
       </body>
