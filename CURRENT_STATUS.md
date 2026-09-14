@@ -1,5 +1,36 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🔥 502 Bad Gateway — stale duplicate deploy dir was port-squatting the real one — Sep 14, 2026
+Site was fully down (nginx 502, not a crash) after a merge to `main`. Root
+cause **was not the merge**: `/opt/FinFlow` and `/opt/FinFlow/Finflow` are
+two separate, unrelated `docker-compose` stacks that both bind host ports
+`3001`/`8001`. Server shell history showed a prior session doing manual
+`docker compose down`/`up --build` cycles inside the stale `.../Finflow`
+copy (dated Jul 3, half-`git init`'d, never committed) while debugging
+something unrelated; it was left in the `down` state, and since the real
+`/opt/FinFlow` stack also wasn't running at that moment, nothing held the
+ports and nginx had nothing to proxy to.
+
+**This corrects two earlier entries in this file** (the "second, unused
+nested copy... left in place, harmless" notes below) — it was not harmless,
+it was a live landmine: whoever next ran `docker compose up` in that stale
+directory would silently steal the real app's ports and cause this exact
+outage again.
+
+**Fix**: confirmed `/opt/FinFlow` (not `.../Finflow`) is the fresh,
+currently-deployed one (`backend/main.py` edited today vs. the stale copy's
+July 3 version). Brought `/opt/FinFlow`'s stack up
+(`docker compose up -d --build`) — db/redis/backend/frontend all healthy,
+site verified live. Backed up the stale directory to
+`/root/backups/finflow-stale-Finflow-subdir-20260914-182100.tar.gz`, then
+deleted `/opt/FinFlow/Finflow` for good.
+
+**Still true and still the real fix needed**: `/opt/FinFlow` has no `.git`
+— it's `scp`/`tar`-deployed by hand. Until it's a real `git clone` with
+`git pull && docker compose up -d --build` as the deploy step, this class of
+drift (multiple silently-diverged copies, no way to diff against git) can
+happen again. Recommended, not done yet.
+
 ## mStock fund sync fixed end-to-end, token lifetime bumped to 30 days — Sep 14, 2026
 Three real, sequential bugs in `backend/brokers/mstock.py`'s `fetch_funds()`,
 each only visible after fixing the one before it — no guessing skipped:
@@ -76,7 +107,9 @@ diverged:
   byte-for-byte (confirmed via diff before touching anything).
 - A second, unused nested copy at `/opt/FinFlow/Finflow/frontend/` (not
   referenced by `docker-compose.yml`'s build context) added to the confusion
-  during investigation — left in place, harmless, but worth cleaning up.
+  during investigation — left in place at the time. **Update: this was not
+  harmless** — see the 502 entry at the top of this file for the outage it
+  caused and the deletion.
 
 **Fix**: merged `main` into `feature/market-board-tab` locally (real 2-parent
 merge — resolved 11 conflicts across `.env.example`, `.gitignore`,
@@ -236,10 +269,11 @@ non-independence of overlapping observations (the same idea as the
   re-priced every fully-graded historical snapshot forever — fixed by
   filtering out rows where `hit_30d` is already set. New tests in
   `backend/tests/test_trend_snapshot.py` cover both.
-- Left alone (found, not yet acted on): `Finflow/Finflow/docker-compose.yml`
-  is a genuinely empty (0 bytes), stale file dated Jul 3 — harmless but
-  confusing for a future session; flagging for deletion rather than
-  deleting without being asked.
+- Left alone (found, not yet acted on) at the time: `Finflow/Finflow/docker-compose.yml`
+  was flagged for deletion rather than deleted without being asked. **Update:
+  it (and the whole stale `/opt/FinFlow/Finflow` directory) caused a real
+  502 outage** — see the entry at the top of this file. Deleted, with a
+  backup taken first.
 
 ## 📉 Sixth null result: low-volatility factor — no edge — Sep 14, 2026
 Tested whether buying the lowest-realized-volatility decile of NIFTY 50 beats
