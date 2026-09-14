@@ -63,3 +63,9 @@ Thumbs.db
 Gemini_Generated_Image_*.png
 files.zip
 finflow_docs.zip
+
+# Dev database
+finflow_dev.db
+
+# Code analysis cache
+graphify-out/
