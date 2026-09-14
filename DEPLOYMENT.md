@@ -2,6 +2,17 @@
 
 This guide details how to deploy and maintain FinFlow on any Linux VPS (Ubuntu 22.04 / 24.04 LTS recommended on Hostinger, DigitalOcean, AWS, Linode, Hetzner, etc.) using Docker and Docker Compose.
 
+> **Status: already deployed, with HTTPS.** Live at `https://finflow.fortressintelligence.space` (Hostinger VPS `76.13.179.32`, nginx reverse proxy + free Let's Encrypt cert, auto-renews). Security-audited — see `CURRENT_STATUS.md` for the live URL, what was fixed, and the full audit. The steps below are the general playbook and don't match exactly how this instance was actually set up:
+> - Code was copied with `scp`/`tar` directly to `/opt/FinFlow`, not `git clone` — no GitHub deploy key was set up on the VPS. **This is a known gap — see "Note on the current VPS deploy" below.**
+> - Ports are remapped to 8001 (API) / 3001 (app) internally — the VPS already runs other apps on 8000/3000/5432 — but neither is meant to be hit directly anymore; nginx on 80/443 is the front door.
+> - Postgres and Redis have no host port at all (container-internal only).
+> - To redeploy after a code change: `scp` the changed file(s) to `/opt/FinFlow/...` on the VPS, then `ssh root@76.13.179.32 "cd /opt/FinFlow && docker compose up -d --build <service>"` (`backend`, `frontend`, or omit the service name to rebuild everything).
+
+## 📋 Prerequisites
+1.  **VPS Server**: Ubuntu 22.04 LTS (Recommended) with at least 2GB RAM.
+2.  **Domain Name** (Optional but recommended).
+3.  **Git Repository**: GitHub/GitLab (Private).
+
 ---
 
 ## 📋 System Requirements
@@ -39,6 +50,21 @@ cp .env.example .env
 nano .env
 ```
 *Customize your PostgreSQL password, database name, and secret keys.*
+
+Paste your production secrets:
+```ini
+POSTGRES_USER=finflow_secure_user
+POSTGRES_PASSWORD=EXTREMELY_COMPLEX_PASSWORD_HERE
+POSTGRES_DB=finflow_prod
+DATABASE_URL=postgresql://finflow_secure_user:EXTREMELY_COMPLEX_PASSWORD_HERE@db:5432/finflow_prod
+REDIS_URL=redis://redis:6379/0
+SECRET_KEY=GENERATE_A_LONG_RANDOM_STRING_HERE
+APP_ENCRYPTION_KEY=GENERATE_WITH_Fernet.generate_key()
+EXCHANGERATE_API_KEY=your_real_api_key
+```
+`APP_ENCRYPTION_KEY` encrypts broker credentials at rest — without it, `/holdings/accounts` throws on every request. Generate one: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+
+---
 
 ### 5. Launch Application
 ```bash

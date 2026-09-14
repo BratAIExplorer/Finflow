@@ -1,53 +1,14 @@
-version: '3.8'
+version: '3.9'
 
 services:
-  # Next.js Frontend (Light & Dark UI with glassmorphic cards)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: finflow-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - BACKEND_INTERNAL_URL=http://backend:8000
-    depends_on:
-      - backend
-    networks:
-      - finflow-network
-
-  # FastAPI Backend API Service
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: finflow-backend
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-finflow_user}:${POSTGRES_PASSWORD:-finflow_secure_password}@db:5432/${POSTGRES_DB:-finflow_db}
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-finflow_default_production_secret_key_change_me}
-      - EXCHANGERATE_API_KEY=${EXCHANGERATE_API_KEY:-}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - finflow-network
-
   # PostgreSQL Database
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: finflow-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-finflow_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_secure_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_password}
       POSTGRES_DB: ${POSTGRES_DB:-finflow_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -66,6 +27,57 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finflow-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: finflow-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-finflow_user}:${POSTGRES_PASSWORD:-finflow_password}@db:5432/${POSTGRES_DB:-finflow_db}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    networks:
+      - finflow-network
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://finflow.fortressintelligence.space/api
+    container_name: finflow-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: https://finflow.fortressintelligence.space/api
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
     networks:
       - finflow-network
 

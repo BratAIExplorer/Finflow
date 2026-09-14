@@ -2,15 +2,34 @@
 
 import { motion, Variants } from "framer-motion";
 import { ArrowRight, BarChart3, Wallet, ShieldCheck, Globe, Zap, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/ui/StatCard";
 import { PortfolioChart } from "@/components/ui/PortfolioChart";
 import { AddAssetForm } from "@/components/AddAssetForm";
+import { BrokerSettings } from "@/components/BrokerSettings";
+import { LoginModal, TOKEN_KEY } from "@/components/LoginModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
+  const router = useRouter();
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
+  const [isBrokerOpen, setIsBrokerOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    setAuthed(!!localStorage.getItem(TOKEN_KEY));
+  }, []);
+
+  const signOut = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    setAuthed(false);
+  };
+
+  // A view that needs auth calls this; opens the login modal if not signed in.
+  const requireAuth = (open: () => void) => () => (authed ? open() : setIsLoginOpen(true));
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -39,9 +58,14 @@ export default function Home() {
         <div className="glass-surface py-3 px-6 md:px-8 rounded-full flex items-center justify-between glass-border shadow-2xl">
           <div className="text-2xl font-extrabold font-outfit tracking-tighter prime-gradient-text">FINFLOW</div>
           <div className="flex items-center gap-6 text-base font-semibold text-slate-600 dark:text-gray-400">
-            <a href="#" className="hover:text-indigo-600 dark:hover:text-white transition-colors">Platform</a>
-            <a href="#" className="hover:text-indigo-600 dark:hover:text-white transition-colors">Plugins</a>
+            <button onClick={requireAuth(() => router.push("/portfolio"))} className="hover:text-indigo-600 dark:hover:text-white transition-colors">Portfolio</button>
+            <button onClick={requireAuth(() => setIsBrokerOpen(true))} className="hover:text-indigo-600 dark:hover:text-white transition-colors">Plugins</button>
             <a href="#" className="hover:text-indigo-600 dark:hover:text-white transition-colors">Family</a>
+            {authed ? (
+              <button onClick={signOut} className="hover:text-indigo-600 dark:hover:text-white transition-colors">Sign out</button>
+            ) : (
+              <button onClick={() => setIsLoginOpen(true)} className="text-indigo-500 dark:text-indigo-300 hover:text-indigo-600 dark:hover:text-white transition-colors">Sign in</button>
+            )}
           </div>
           {/* Light / Dark Mode Switcher */}
           <div className="flex items-center gap-2">
@@ -84,7 +108,7 @@ export default function Home() {
 
           <motion.div variants={itemVariants} className="mt-10 flex gap-4 justify-center flex-wrap">
             <button
-              onClick={() => alert("Welcome to FinFlow Prime! Ready for all portfolios.")}
+              onClick={authed ? () => router.push("/portfolio") : () => setIsLoginOpen(true)}
               className="px-9 py-4.5 rounded-full bg-indigo-600 hover:bg-indigo-700 dark:bg-white dark:text-black dark:hover:bg-slate-100 text-white font-bold text-base md:text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 shadow-lg shadow-indigo-500/25 dark:shadow-[0_0_20px_rgba(255,255,255,0.3)] z-20 cursor-pointer"
             >
               Get Started <ArrowRight className="w-5 h-5" />
@@ -234,6 +258,8 @@ export default function Home() {
 
       {/* Asset Form Modal */}
       <AddAssetForm isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
+      <BrokerSettings isOpen={isBrokerOpen} onClose={() => setIsBrokerOpen(false)} />
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onAuthed={() => setAuthed(true)} />
     </div>
   );
 }

@@ -1,0 +1,13 @@
+{
+  "runs": [
+    {
+      "date": "2026-09-10T14:55:37.084389+00:00",
+      "input_tokens": 1181,
+      "output_tokens": 228,
+      "files": 31,
+      "note": "incremental --update (34 changed files; Finflow/ dupe + boilerplate SVGs excluded)"
+    }
+  ],
+  "total_input_tokens": 1181,
+  "total_output_tokens": 228
+}
