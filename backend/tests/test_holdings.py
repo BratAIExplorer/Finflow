@@ -146,6 +146,7 @@ class _FakeClient:
 def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
     from backend.brokers import mstock
 
+    login_resp = _FakeResponse({"data": {}})
     totp_resp = _FakeResponse({"data": {"access_token": "fake-jwt"}})
     holdings_resp = _FakeResponse({
         "data": [
@@ -153,7 +154,7 @@ def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
             {"tradingsymbol": "SOLDOUT", "exchange": "NSE", "quantity": 0, "averageprice": 50.0},
         ]
     })
-    fake_client = _FakeClient([totp_resp, holdings_resp])
+    fake_client = _FakeClient([login_resp, totp_resp, holdings_resp])
     monkeypatch.setattr(mstock.httpx, "Client", lambda timeout=15: fake_client)
     monkeypatch.setattr(mstock.pyotp, "TOTP", lambda secret: type("T", (), {"now": lambda self: "111111"})())
 
