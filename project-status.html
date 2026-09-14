@@ -38,10 +38,31 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 08:02 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
-commit <code>77999ea</code> &middot; chore: regenerate project-status.html after main merge</div>
+<div class="meta">Generated 2026-09-14 08:04 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
+commit <code>7095d4e</code> &middot; fix(mstock): harden token extraction, fix test mock, and update project-status.html</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
+<h2>🚀 VPS Deploy Drift Fixed: Theme Engine Now Actually Live — Sep 14, 2026</h2>
+<p>Discovered the Light/Dark toggle documented as &quot;done&quot; (see below) had never reached the live site, because three copies of the frontend had silently diverged:</p>
+<ul>
+<li><code>main</code> (git) had the real theme-engine code (<code>ThemeToggle.tsx</code>, pre-hydration</li>
+</ul>
+<p>  script, typography scale).</p>
+<ul>
+<li><code>feature/market-board-tab</code> (git) was branched before that commit and never</li>
+</ul>
+<p>  merged it — same hardcoded <code>className=&quot;dark&quot;</code> bug, no toggle.</p>
+<ul>
+<li><strong>The VPS itself (<code>/opt/FinFlow</code>) has no <code>.git</code> at all</strong> — it&#x27;s a manual</li>
+</ul>
+<p>  <code>scp</code>/file-drop deploy that had drifted from *both* branches independently,   and turned out to match <code>feature/market-board-tab</code>&#x27;s pre-merge state almost   byte-for-byte (confirmed via diff before touching anything).</p>
+<ul>
+<li>A second, unused nested copy at <code>/opt/FinFlow/Finflow/frontend/</code> (not</li>
+</ul>
+<p>  referenced by <code>docker-compose.yml</code>&#x27;s build context) added to the confusion   during investigation — left in place, harmless, but worth cleaning up.</p>
+<p><strong>Fix</strong>: merged <code>main</code> into <code>feature/market-board-tab</code> locally (real 2-parent merge — resolved 11 conflicts across <code>.env.example</code>, <code>.gitignore</code>, <code>CURRENT_STATUS.md</code>, <code>DEPLOYMENT.md</code>, <code>README.md</code>, <code>docker-compose.yml</code>, <code>frontend/Dockerfile</code>, <code>layout.tsx</code>, <code>page.tsx</code>, <code>PortfolioChart.tsx</code>, <code>lib/utils.ts</code>), keeping this branch&#x27;s auth flow (<code>LoginModal</code>, <code>BrokerSettings</code>, <code>requireAuth</code> gating) alongside <code>main</code>&#x27;s <code>ThemeToggle</code> and styling. Verified backend pytest (65/66 — see known-issue note below) and a clean frontend production build before pushing to <code>origin/feature/market-board-tab</code>. Then <code>scp</code>&#x27;d the merged frontend files to <code>/opt/FinFlow/frontend/</code> (the real build path) via a one-off SSH key set up for this session, and rebuilt the <code>frontend</code> container. Verified live: <code>finflow-theme</code> (the toggle&#x27;s localStorage key) and the &quot;Sign in&quot; button both present in the served HTML, public site returns <code>200</code>.</p>
+<p><strong>Known pre-existing issue (not caused by this work, not fixed yet)</strong>: <code>backend/tests/test_holdings.py::test_mstock_fetch_holdings_parses_and_filters_zero_qty</code> fails because its fake HTTP fixture only queues one response before the <code>ensure_session()</code> call, but that method now makes two real calls (<code>/login</code> then <code>/verifytotp</code>) since <code>ec0aa98</code>&#x27;s 502-fix. No production impact — the connector logic is correct, only the test fixture is stale.</p>
+<p><strong>Follow-up recommended, not done yet</strong>: set up a real <code>git clone</code> on the VPS so future deploys are <code>git pull &amp;&amp; rebuild</code> instead of hand-copied files — today&#x27;s whole investigation started because the server silently drifted from every git branch with no way to diff against it.</p>
 <h2>📊 Deepak&#x27;s Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026</h2>
 <p>Migrated the entire standalone market board functionality from <code>C:\Antigravity\My Bots\DadsDashboard</code> directly into FinFlow&#x27;s <code>/portfolio</code> page as a dedicated <strong>Market Board</strong> tab placed right after News:</p>
 <ul>

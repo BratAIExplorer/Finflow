@@ -1,5 +1,47 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🚀 VPS Deploy Drift Fixed: Theme Engine Now Actually Live — Sep 14, 2026
+Discovered the Light/Dark toggle documented as "done" (see below) had never
+reached the live site, because three copies of the frontend had silently
+diverged:
+- `main` (git) had the real theme-engine code (`ThemeToggle.tsx`, pre-hydration
+  script, typography scale).
+- `feature/market-board-tab` (git) was branched before that commit and never
+  merged it — same hardcoded `className="dark"` bug, no toggle.
+- **The VPS itself (`/opt/FinFlow`) has no `.git` at all** — it's a manual
+  `scp`/file-drop deploy that had drifted from *both* branches independently,
+  and turned out to match `feature/market-board-tab`'s pre-merge state almost
+  byte-for-byte (confirmed via diff before touching anything).
+- A second, unused nested copy at `/opt/FinFlow/Finflow/frontend/` (not
+  referenced by `docker-compose.yml`'s build context) added to the confusion
+  during investigation — left in place, harmless, but worth cleaning up.
+
+**Fix**: merged `main` into `feature/market-board-tab` locally (real 2-parent
+merge — resolved 11 conflicts across `.env.example`, `.gitignore`,
+`CURRENT_STATUS.md`, `DEPLOYMENT.md`, `README.md`, `docker-compose.yml`,
+`frontend/Dockerfile`, `layout.tsx`, `page.tsx`, `PortfolioChart.tsx`,
+`lib/utils.ts`), keeping this branch's auth flow (`LoginModal`,
+`BrokerSettings`, `requireAuth` gating) alongside `main`'s `ThemeToggle` and
+styling. Verified backend pytest (65/66 — see known-issue note below) and a
+clean frontend production build before pushing to `origin/feature/market-board-tab`.
+Then `scp`'d the merged frontend files to `/opt/FinFlow/frontend/` (the real
+build path) via a one-off SSH key set up for this session, and rebuilt the
+`frontend` container. Verified live: `finflow-theme` (the toggle's
+localStorage key) and the "Sign in" button both present in the served HTML,
+public site returns `200`.
+
+**Known pre-existing issue (not caused by this work, not fixed yet)**:
+`backend/tests/test_holdings.py::test_mstock_fetch_holdings_parses_and_filters_zero_qty`
+fails because its fake HTTP fixture only queues one response before the
+`ensure_session()` call, but that method now makes two real calls
+(`/login` then `/verifytotp`) since `ec0aa98`'s 502-fix. No production
+impact — the connector logic is correct, only the test fixture is stale.
+
+**Follow-up recommended, not done yet**: set up a real `git clone` on the VPS
+so future deploys are `git pull && rebuild` instead of hand-copied files —
+today's whole investigation started because the server silently drifted from
+every git branch with no way to diff against it.
+
 ## 📊 Deepak's Market Board Migrated as 4th Tab in Portfolio (NEW) — Sep 14, 2026
 Migrated the entire standalone market board functionality from `C:\Antigravity\My Bots\DadsDashboard` directly into FinFlow's `/portfolio` page as a dedicated **Market Board** tab placed right after News:
 - **Zero Functionality Lost**:
