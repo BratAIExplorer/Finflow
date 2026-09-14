@@ -22,7 +22,7 @@ checked against the actual JSON returned (see backend/tests/test_mstock_connecto
 for how to do that safely) before this touches a real account.
 """
 import binascii
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional
 
 import httpx
@@ -35,6 +35,7 @@ LOGIN_URL = f"{BASE_URL}/openapi/typea/connect/login"
 VERIFY_TOTP_URL = f"{BASE_URL}/openapi/typea/session/verifytotp"
 HOLDINGS_URL = f"{BASE_URL}/openapi/typeb/portfolio/holdings"
 FUNDS_URL = f"{BASE_URL}/openapi/typea/user/fundsummary"
+TRADES_URL = f"{BASE_URL}/openapi/typea/trades"
 
 # Response JSON may use any of these keys for the session token depending on
 # API version/typeA vs typeB quirks — first match wins.
@@ -116,6 +117,103 @@ class MStockConnector(BrokerConnector):
             "access_token_date": datetime.now().date().isoformat(),
         }
 
+    def _fetch_trade_dates(self) -> dict[str, date]:
+        """Queries mStock's /trades endpoint to auto-populate acquisition dates.
+        Reconciles executions chronologically via FIFO so that the earliest active purchase
+        lot determines first_buy_date.
+        
+        Silently returns {} on failure so holding synchronization is never disrupted.
+        """
+        api_key = self.credentials.get("api_key")
+        access_token = self.session_state.get("access_token")
+        if not api_key or not access_token:
+            return {}
+
+        today = datetime.now().date()
+        from_date = (today - timedelta(days=365)).isoformat()
+        to_date = today.isoformat()
+
+        headers = {
+            "X-Mirae-Version": "1",
+            "Authorization": f"token {api_key}:{access_token}",
+        }
+
+        try:
+            with httpx.Client(timeout=15) as client:
+                resp = client.get(
+                    TRADES_URL,
+                    headers=headers,
+                    params={"fromdate": from_date, "todate": to_date},
+                )
+                if resp.status_code != 200:
+                    return {}
+                payload = resp.json()
+                trades_data = payload.get("data", [])
+                return self._calculate_first_buy_dates(trades_data)
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _calculate_first_buy_dates(trades_data: list[dict]) -> dict[str, date]:
+        """Groups trades by symbol, sorts chronologically, executes FIFO deduction
+        for sells, and returns {symbol: earliest_active_buy_date}."""
+        trades_by_sym: dict[str, list[dict]] = {}
+        for item in trades_data:
+            sym = (item.get("tradingsymbol") or item.get("symbol") or item.get("SYMBOL") or "").strip().upper()
+            if not sym:
+                continue
+            ts_str = (
+                item.get("order_timestamp")
+                or item.get("exchange_timestamp")
+                or item.get("ORDER_DATE_TIME")
+                or ""
+            )
+            d = None
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y"):
+                try:
+                    d = datetime.strptime(ts_str.strip(), fmt).date()
+                    break
+                except (ValueError, AttributeError):
+                    continue
+            if not d:
+                continue
+
+            action = (item.get("transaction_type") or item.get("BUY_SELL") or "BUY").strip().upper()
+            qty = float(item.get("quantity") or item.get("QUANTITY") or 0)
+
+            trades_by_sym.setdefault(sym, []).append({
+                "action": action,
+                "qty": qty,
+                "date": d,
+                "ts_raw": ts_str,
+            })
+
+        result: dict[str, date] = {}
+        for sym, sym_trades in trades_by_sym.items():
+            sym_trades.sort(key=lambda x: (x["date"], x["ts_raw"]))
+            buy_lots: list[dict] = []
+            for t in sym_trades:
+                if t["action"] in ("BUY", "B"):
+                    buy_lots.append({"qty": t["qty"], "date": t["date"]})
+                elif t["action"] in ("SELL", "S"):
+                    qty_to_sell = t["qty"]
+                    for lot in buy_lots:
+                        if lot["qty"] <= 0:
+                            continue
+                        if lot["qty"] >= qty_to_sell:
+                            lot["qty"] -= qty_to_sell
+                            qty_to_sell = 0
+                            break
+                        else:
+                            qty_to_sell -= lot["qty"]
+                            lot["qty"] = 0
+
+            active_lots = [lot for lot in buy_lots if lot["qty"] > 0]
+            if active_lots:
+                result[sym] = active_lots[0]["date"]
+
+        return result
+
     def fetch_holdings(self) -> list[RawHolding]:
         self.ensure_session()
         api_key = self.credentials["api_key"]
@@ -132,21 +230,25 @@ class MStockConnector(BrokerConnector):
         except httpx.HTTPError as e:
             raise BrokerConnectionError(f"mStock holdings fetch failed: {e}") from e
 
+        trade_dates = self._fetch_trade_dates()
+
         rows = payload.get("data", [])
         holdings = []
         for row in rows:
             qty = float(row.get("quantity", 0) or 0)
             if qty <= 0:
                 continue  # fully sold / zero-quantity rows aren't a current holding
+            sym = row["tradingsymbol"]
+            norm_sym = sym.strip().upper()
             holdings.append(
                 RawHolding(
-                    symbol=row["tradingsymbol"],
+                    symbol=sym,
                     exchange=row.get("exchange", "NSE"),
                     quantity=qty,
                     avg_buy_price=float(row.get("averageprice", 0) or 0),
                     isin=row.get("isin"),
                     currency="INR",
-                    first_buy_date=None,  # mStock's holdings API doesn't return this — left for the user to see as "date unknown"
+                    first_buy_date=trade_dates.get(norm_sym),
                 )
             )
         return holdings
