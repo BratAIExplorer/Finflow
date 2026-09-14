@@ -168,9 +168,17 @@ class MStockConnector(BrokerConnector):
             raise BrokerConnectionError(f"mStock funds fetch failed: {e}") from e
 
         data = payload.get("data", {})
-        # The key we found earlier is AVAILABLE_BALANCE
+        # ⚠ CONFIRM-BEFORE-LIVE: assumed data is a dict with AVAILABLE_BALANCE
+        # (seen on an earlier account) — fail loudly with the real payload
+        # instead of guessing at a different shape, so the actual response
+        # is visible in last_sync_error rather than crashing with a 500.
+        if not isinstance(data, dict):
+            raise BrokerConnectionError(
+                f"mStock funds response shape unexpected (data is a {type(data).__name__}, "
+                f"not an object): {data!r}"
+            )
         balance_str = data.get("AVAILABLE_BALANCE", "0")
         try:
             return float(balance_str)
-        except ValueError:
+        except (ValueError, TypeError):
             return 0.0
