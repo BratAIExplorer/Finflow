@@ -1,5 +1,153 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## ⚠️ RETRACTION: neither momentum finding holds up — Sep 14, 2026
+Two entries below (**"Strongest finding yet: sector laggards bounce back"**
+and the Nifty-relative momentum result inside **"Two follow-up backtests"**)
+are **retracted**. Both survived a first round of review but not a second,
+more careful one. Left in place below rather than deleted, with this notice
+first — showing what changed and why matters more than a clean-looking history.
+
+**What was wrong, found by re-reviewing the methodology (not new data):**
+1. **Wrong null.** The 55.3%/56.6%/z=-10.7 figures were compared against a
+   50% coin flip. The actual unconditional base rate (price up in 30 days,
+   this universe/window) is **51.5%** — the real gap was smaller than reported.
+2. **Absolute grading of a relative claim.** "Outperform Nifty" is a relative
+   claim (beat the benchmark), but it was graded on the stock's *absolute*
+   price direction, not on whether the outperformance continued. A stock can
+   beat a falling Nifty while falling itself — that's not what the label
+   claims to predict, and it lets generic market drift masquerade as edge.
+   The sector-relative "reversal" finding's headline evidence — hit rate
+   strengthening monotonically from 1d→30d — has an equally parsimonious
+   explanation under this bug: longer windows accumulate more drift, which
+   *mechanically* produces that exact monotonic shape with zero real
+   reversal effect required. Same bug, same illusion, both tests.
+3. **Overlapping samples faked the sample size.** z-scores were computed as
+   if 2,395 daily-sampled, 30-day-forward-window rows were independent
+   trials. Consecutive rows share ~97% of their window. The real
+   independent sample size is roughly (stocks) × (non-overlapping 6-month
+   blocks) — on 16 stocks, about 30, not 2,395.
+4. **Contradicted by better prior art already in this org.**
+   `TradingBot/strategies/BACKTEST_FINDINGS.md` §9 already ran proper
+   Jegadeesh-Titman 12-1 cross-sectional momentum — 48 Nifty names,
+   **15 years**, monthly (non-overlapping), 40bps single-stock cost — and it
+   **lost to equal-weight buy-and-hold** (18.2% vs 19.7% CAGR). Same factor
+   family, far higher rigor, already answered. This should have been found
+   during the original reuse-first search and wasn't — a real miss.
+
+**Corrected diagnostic, run to confirm rather than just argue the math**:
+fixed both bugs (relative-continuation grading + non-overlapping blocks) in
+`backtest_momentum_corrected()`, re-ran on both the 16-stock and 50-stock
+(`NIFTY_50`) universes, and on the sector-relative test. Every cell's
+significance measured against its own matched empirical base rate, not an
+assumed 50%:
+
+| Test | n | Hit rate | Base rate | z |
+|---|---|---|---|---|
+| Nifty-relative Outperform (16 stocks) | 15 | 60.0% | 50.0% | 0.77 |
+| Nifty-relative Underperform (16 stocks) | 13 | 69.2% | 50.0% | 1.38 |
+| Nifty-relative Outperform (50 stocks) | 44 | 63.6% | 56.2% | 0.99 |
+| Nifty-relative Underperform (50 stocks) | 46 | 52.2% | 56.2% | -0.55 |
+| Sector-relative Outperform | 33 | 39.4% | 46.3% | **-0.79** |
+| Sector-relative Underperform | 40 | 47.5% | 46.3% | 0.15 |
+
+**Every cell is under |z|=1.4 — indistinguishable from noise, several not
+even pointed the direction originally claimed.** This is a confirmatory
+diagnostic on a small sample (30-96 observations per test), not the decisive
+evidence on its own — `BACKTEST_FINDINGS.md` §9's 15-year result is what
+actually settles it, and this corrected re-test agrees with it rather than
+contradicting it. Consistent, not coincidental.
+
+**Practical conclusion, matching this org's own prior finding**: no active
+signal tested so far — RSI/MACD, ADX-gated, 200-DMA-gated, Nifty-relative
+momentum, sector-relative momentum — beats simply holding a diversified
+basket, net of realistic assumptions. The trend label on the dashboard
+should be read as descriptive, not predictive. The parallel session's draft
+plan to migrate the dashboard's trend label to the momentum signal should
+**stop**, not pause — the finding it was built on didn't hold up.
+
+**Adopted going forward**: any future signal claim in this project reports
+significance corrected for the number of variants checked and for
+non-independence of overlapping observations (the same idea as the
+"Deflated Sharpe Ratio") — never a raw/naive z-score.
+
+**Also fixed while reviewing this (unrelated bugs, both live in production, not deferred):**
+- `docker-compose.yml`: `ACCESS_TOKEN_EXPIRE_MINUTES: 30` was hardcoded,
+  silently overriding `auth.py`'s 7-day default and unfixable via `.env` —
+  Dad was being logged out every 30 minutes in production. Fixed to
+  `${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}`. Also dropped `--reload` from the
+  prod uvicorn command — combined with the `./backend` bind mount, any file
+  touch on the VPS was restarting the whole app (and the in-process
+  scheduler) mid-run. **Requires a VPS-side redeploy to take effect** —
+  `/opt/FinFlow` is `scp`/`tar`-deployed, not git-managed (per
+  `DEPLOYMENT.md`), so editing this repo file alone doesn't reach
+  production; whoever deploys next must edit
+  `/opt/FinFlow/docker-compose.yml` directly and run
+  `docker compose up -d backend`.
+- `backend/jobs/trend_snapshot.py`'s `grade_pending_snapshots()` had two
+  real bugs, fixed rather than deferred since the job runs live daily and
+  every day deferred was another day of bad data written to the very table
+  meant to keep this honest: (1) it graded against *today's* live price
+  compared by calendar days, which silently mis-grades on weekends/holidays
+  (Saturday's "current price" is Friday's close, so a Friday snapshot's
+  1-day grade compares a price to itself) — fixed to grade against the
+  actual close on/after the due *trading* date; (2) it re-queried and
+  re-priced every fully-graded historical snapshot forever — fixed by
+  filtering out rows where `hit_30d` is already set. New tests in
+  `backend/tests/test_trend_snapshot.py` cover both.
+- Left alone (found, not yet acted on): `Finflow/Finflow/docker-compose.yml`
+  is a genuinely empty (0 bytes), stale file dated Jul 3 — harmless but
+  confusing for a future session; flagging for deletion rather than
+  deleting without being asked.
+
+## 🏆 RETRACTED — Strongest finding yet: sector laggards bounce back — Sep 14, 2026
+Continued digging for signals after the Nifty-relative momentum result.
+GitHub-checked first (per dev workflow): reviewed `backtesting.py` (8,961★),
+`vectorbt` (9,081★) and `ta-lib-python` (12,245★) — none earned their
+complexity for what was left to test (a couple more indicator formulas, a
+different benchmark series); stuck with the existing hand-rolled, tested
+`backtest_trend.py`. Reused `TradingBot/strategies/sector_map.py`'s NSE
+sector mapping instead of building one.
+
+- **Momentum lookback scan** (1/3/6/9/12 months): 6-month remains the
+  cleanest single window (55.3% @ 30d, z=5.2). The 9-12mo "losers keep
+  losing" cells were also large (z=3.8-4.2) but came from scanning five
+  windows to find them — flagged as unconfirmed until tested on an
+  independent universe, not treated as a finding on their own.
+- **Volume confirmation** (only count a 6mo-Outperform call when that day's
+  volume is above its own 20-day average): hit rate rose from 55.3% to
+  **57.6%** at 30 days, but on roughly half the sample (n=962 vs 2,395) — so
+  the raw z-score actually *fell* slightly (5.2 → 4.7) despite the better
+  point estimate. Both are strongly significant; volume confirmation trades
+  frequency for a somewhat higher per-call hit rate, it doesn't add a new
+  edge on top of momentum.
+- **Sector-relative momentum** (has a stock beaten its *own sector peers*
+  over 6 months, leave-one-out so it's never compared against itself; 40
+  symbols across 10 sectors, reusing TradingBot's sector map): outperformers
+  showed a **weaker** version of the Nifty-relative result (53.6% @ 30d,
+  z=5.7). But the underperform side is the real story:
+  **sector laggards do not keep lagging — they bounce.** Betting that an
+  underperformer keeps falling was wrong **56.5% of the time** at 30 days
+  (43.5% hit rate against a "keeps falling" bet — z = **-10.7**, the largest
+  magnitude of anything tested this session), and the effect **strengthens
+  monotonically** with the window: z = -1.9 (1d) → -4.3 (7d) → -10.7 (30d).
+  A clean, monotonic pattern across one test (not five scanned windows) is
+  what makes this the most convincing single result so far — this reads as
+  genuine mean-reversion: a stock that's quietly fallen behind its own
+  sector peers tends to catch back up, not keep falling further behind.
+- **Practical read**: two independent, real effects now identified —
+  (1) a stock beating the broad market over 6 months tends to keep beating
+  it (continuation), and (2) a stock lagging its own sector peers tends to
+  catch back up (reversion). These point in different directions
+  deliberately — momentum vs. mean-reversion are the two classic families
+  of quant signals, and finding one real example of each is a more solid
+  foundation than finding two variations on the same idea.
+- Code: `backtest_momentum()` extended with `volume=`, plus
+  `build_sector_benchmark()` and `run_sector_momentum()`, all in
+  `backend/tools/backtest_trend.py`. Tests: 14 total (5 new) in
+  `backend/tests/test_backtest_trend.py`.
+- Not built into the product yet — still at the "what's real" stage; next
+  is deciding what to actually put in front of Dad.
+
 ## 🔑 mStock connector was re-authenticating via TOTP on every single sync — Sep 14, 2026
 Found while tracing the broker-abstraction graph: `MStockConnector` stored its
 daily session token only as an in-memory instance attribute
@@ -24,7 +172,12 @@ TOTP round-trip, whether or not the token from an hour ago was still valid.
   default to `{}`, so old mStock accounts just re-auth once more on the first
   sync after deploy, then cache normally like Zerodha does.
 
-## 🎯 Two follow-up backtests — one real signal found, one didn't hold up — Sep 14, 2026
+## 🎯 Two follow-up backtests — RETRACTED (see top of this file) — Sep 14, 2026
+**The "real signal" (Nifty-relative momentum) below is retracted — see the
+⚠️ RETRACTION entry at the top of this file for why (wrong null, absolute-
+vs-relative grading bug, overlapping samples).** The 200-DMA result's
+"inconclusive" verdict still stands as originally written.
+
 Extended `backend/tools/backtest_trend.py` with the two candidates from the
 "how would you improve accuracy" discussion, same 16-symbol/2-year data, same
 no-lookahead/direction-only methodology as the original (coin-flip) result:

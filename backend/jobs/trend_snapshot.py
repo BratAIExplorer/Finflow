@@ -63,35 +63,62 @@ def snapshot_all_holdings(db: Session) -> int:
 
 
 def grade_pending_snapshots(db: Session) -> int:
-    """For every snapshot with a due, ungraded window, fetch the current price
-    and record whether the call's direction was correct. Returns the count of
-    (snapshot, window) pairs graded."""
+    """For every snapshot with a due, ungraded window, grade it against the
+    actual close on/after the window's due trading date. Returns the count of
+    (snapshot, window) pairs graded.
+
+    Grades against a specific historical close, not "today's price" — grading
+    by calendar days against the most recent live price is wrong on a
+    weekend/holiday: on a Saturday, compute_signals() returns Friday's close,
+    so a snapshot captured that same Friday would get graded one calendar day
+    later against the identical price it started from, scoring a false miss
+    on every single "up" call regardless of merit. Fixed by looking up the
+    close on the first trading day at/after the due date instead.
+    """
     graded = 0
-    pending = db.query(TrendSnapshot).filter(TrendSnapshot.direction != "flat").all()
+    # Only rows still missing at least one grade: hit_30d is the longest
+    # window, so once it's set nothing is left to do for that row — without
+    # this filter every fully-graded snapshot gets re-fetched from Yahoo
+    # forever, and the job gets slower every day it runs.
+    pending = (
+        db.query(TrendSnapshot)
+        .filter(TrendSnapshot.direction != "flat")
+        .filter(TrendSnapshot.hit_30d.is_(None))
+        .all()
+    )
+
+    history_cache: dict[tuple[str, str], object] = {}
 
     for snap in pending:
-        try:
-            # ponytail: grades against *today's* price, not the exact close on the
-            # window's due date. Fine since this job runs daily (at most ~1 day of
-            # drift); revisit with fetch_daily_history date-lookup if the job ever
-            # runs less often than the shortest window (1 day).
-            current_price = pricing.compute_signals(snap.symbol, snap.exchange).last_price
-        except ValueError as e:
-            logger.warning("grading skipped for %s: %s", snap.symbol, e)
-            continue
-        if current_price is None:
+        due_windows = [
+            days for days in _WINDOWS
+            if getattr(snap, f"hit_{days}d") is None
+            and datetime.utcnow() >= snap.captured_at + timedelta(days=days)
+        ]
+        if not due_windows:
             continue
 
-        hit = current_price > snap.price_at_capture if snap.direction == "up" else current_price < snap.price_at_capture
+        key = (snap.symbol, snap.exchange)
+        if key not in history_cache:
+            try:
+                history_cache[key] = pricing.fetch_daily_history(snap.symbol, snap.exchange, period="2y")
+            except ValueError as e:
+                logger.warning("grading skipped for %s: %s", snap.symbol, e)
+                history_cache[key] = None
+        df = history_cache[key]
+        if df is None:
+            continue
 
-        for days in _WINDOWS:
-            hit_col = f"hit_{days}d"
-            if getattr(snap, hit_col) is not None:
-                continue  # already graded
-            if datetime.utcnow() < snap.captured_at + timedelta(days=days):
-                continue  # window hasn't elapsed yet
-            setattr(snap, f"price_{days}d", current_price)
-            setattr(snap, hit_col, hit)
+        idx = df.index.tz_localize(None) if df.index.tz is not None else df.index
+        for days in due_windows:
+            target_date = (snap.captured_at + timedelta(days=days)).date()
+            on_or_after = df.loc[idx.date >= target_date]
+            if on_or_after.empty:
+                continue  # due date is beyond the fetched history window; leave pending
+            price_at_target = float(on_or_after["Close"].iloc[0])
+            hit = price_at_target > snap.price_at_capture if snap.direction == "up" else price_at_target < snap.price_at_capture
+            setattr(snap, f"price_{days}d", price_at_target)
+            setattr(snap, f"hit_{days}d", bool(hit))
             graded += 1
 
     db.commit()

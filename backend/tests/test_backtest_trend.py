@@ -151,6 +151,61 @@ def test_momentum_deadband_skips_near_zero_relative_moves():
     assert rows == []  # stock == index the whole time -> relative momentum is ~0, all skipped by the deadband
 
 
+def test_momentum_volume_confirm_drops_low_volume_days():
+    n = 200
+    rng = np.random.default_rng(5)
+    stock_close = 100 + np.cumsum(rng.normal(0.5, 1.0, n))
+    index_close = 100 + np.cumsum(rng.normal(0.0, 1.0, n))
+    idx = pd.date_range("2024-01-01", periods=n, freq="B")
+    # volume alternates low/high so the 20d-average confirmation filter has something to bite on
+    volume = pd.Series([1000 if i % 2 == 0 else 5000 for i in range(n)], index=idx)
+    stock_df = pd.DataFrame({"Close": stock_close, "Volume": volume.values}, index=idx)
+    index_s = pd.Series(index_close, index=idx)
+
+    unconfirmed = backtest_trend.backtest_momentum(stock_df, index_s, "SYN", lookback=60)
+    confirmed = backtest_trend.backtest_momentum(stock_df, index_s, "SYN", lookback=60, volume=stock_df["Volume"])
+    assert len(confirmed) < len(unconfirmed)  # roughly half the days should drop (low-volume days excluded)
+
+
+# ---------- sector-relative momentum ----------
+
+def test_build_sector_benchmark_excludes_the_symbol_itself():
+    idx = pd.date_range("2024-01-01", periods=100, freq="B")
+    closes = {
+        "A": pd.Series(100 + np.arange(100), index=idx),      # trends up hard
+        "B": pd.Series(100 + np.zeros(100), index=idx),       # flat
+        "C": pd.Series(100 - np.arange(100) * 0.1, index=idx),  # trends down slightly
+    }
+    bench_for_a = backtest_trend.build_sector_benchmark(closes, exclude_symbol="A")
+    # benchmark for A should reflect only B and C, never A's own steep uptrend
+    normalized_a_end = closes["A"].iloc[-1] / closes["A"].iloc[0]
+    assert bench_for_a.iloc[-1] < normalized_a_end  # peer average (flat + slight down) is nowhere near A's own rise
+
+
+def test_run_sector_momentum_skips_sectors_below_min_peers(monkeypatch):
+    """A sector with only 1 symbol in the fetched universe can't build a
+    leave-one-out peer benchmark (0 peers) and must be skipped, not crash —
+    the solo sector should contribute zero graded rows, the pair sector some."""
+    idx = pd.date_range("2024-01-01", periods=200, freq="B")
+
+    def fake_fetch(symbol, exchange, period="2y"):
+        rng = np.random.default_rng(hash(symbol) % (2**31))
+        return pd.DataFrame({"Close": 100 + np.cumsum(rng.normal(0.3, 1, 200))}, index=idx)
+
+    monkeypatch.setattr(backtest_trend.pricing, "fetch_daily_history", fake_fetch)
+
+    # PAIR_SECTOR alone: should produce graded rows without error.
+    pair_only = backtest_trend.run_sector_momentum({"X": "PAIR_SECTOR", "Y": "PAIR_SECTOR"}, lookback=60, min_peers=1)
+    assert not pair_only.empty
+
+    # Adding a solo sector must not crash the run, and must not silently pull
+    # LONE into a peer group it doesn't have.
+    with_solo = backtest_trend.run_sector_momentum(
+        {"LONE": "SOLO_SECTOR", "X": "PAIR_SECTOR", "Y": "PAIR_SECTOR"}, lookback=60, min_peers=1,
+    )
+    assert not with_solo.empty
+
+
 def test_summarize_computes_hit_rate_per_label():
     rows = [
         {"symbol": "A", "label": "Bullish", "direction": "up", "adx": 25,
@@ -164,3 +219,76 @@ def test_summarize_computes_hit_rate_per_label():
     assert row["hit_rate_1d"] == 50.0
     assert row["hit_rate_7d"] == 100.0
     assert row["n_30d"] == 1  # the None doesn't count toward the denominator
+
+
+# ---------- corrected diagnostic: relative grading + non-overlapping blocks ----------
+
+def _trending_pair(n=800, seed=13):
+    """Stock that persistently beats a flatter benchmark -- gives the
+    corrected test something non-trivial to grade in both directions."""
+    rng = np.random.default_rng(seed)
+    stock = 100 + np.cumsum(rng.normal(0.15, 1.0, n))
+    bench = 100 + np.cumsum(rng.normal(0.0, 1.0, n))
+    idx = pd.date_range("2022-01-01", periods=n, freq="B")
+    return pd.DataFrame({"Close": stock}, index=idx), pd.Series(bench, index=idx)
+
+
+def test_corrected_uses_non_overlapping_blocks_not_daily_rows():
+    """The whole point of the fix: far fewer rows than the daily-sampled
+    version, because blocks jump by a full lookback instead of by 1 day."""
+    df, bench = _trending_pair(n=800)
+    rows = backtest_trend.backtest_momentum_corrected(df, bench, "SYN", lookback=126)
+    # 800 bars, lookback=126, need a full lookback before AND after each block ->
+    # far fewer than the ~(800-127) daily rows the uncorrected version would produce.
+    assert 0 < len(rows) < 10
+    assert all(rows[i]["symbol"] == "SYN" for i in range(len(rows)))
+
+
+def test_corrected_grades_relative_continuation_not_absolute_direction():
+    """Construct a case where the stock's ABSOLUTE price falls in the next
+    block even though it keeps OUTPERFORMING the benchmark (which falls
+    further) -- the corrected grader must call this a continued Outperform,
+    which the old absolute-direction grader would have gotten backwards."""
+    idx = pd.date_range("2022-01-01", periods=400, freq="B")
+    # First 126 bars: stock roughly flat, benchmark falls -> stock "outperforms" (rel > 0).
+    # Next 126 bars: BOTH fall, but stock falls less -> still outperforms, despite absolute decline.
+    stock = np.concatenate([
+        np.full(126, 100.0),
+        np.linspace(100.0, 95.0, 126),   # stock falls 5%
+        np.full(400 - 252, 95.0),
+    ])
+    bench = np.concatenate([
+        np.linspace(100.0, 90.0, 126),   # benchmark already fell 10% by block boundary
+        np.linspace(90.0, 72.0, 126),    # benchmark falls another ~20%
+        np.full(400 - 252, 72.0),
+    ])
+    df = pd.DataFrame({"Close": stock}, index=idx)
+    bench_s = pd.Series(bench, index=idx)
+
+    rows = backtest_trend.backtest_momentum_corrected(df, bench_s, "SYN", lookback=126)
+    labeled = [r for r in rows if r.get("label") == "Outperform"]
+    assert labeled, "expected at least one Outperform-labeled block"
+    # Stock's absolute price fell in the next block (100 -> 95), but it beat a
+    # benchmark that fell much further -- relative grading must call this a hit.
+    assert labeled[0]["continued"] is True
+
+
+def test_summarize_corrected_reports_matched_base_rate_not_assumed_fifty():
+    rows = [
+        {"symbol": "A", "beat_benchmark_next_block": True, "label": "Outperform", "continued": True},
+        {"symbol": "A", "beat_benchmark_next_block": True, "label": "Outperform", "continued": True},
+        {"symbol": "A", "beat_benchmark_next_block": False},  # unsignaled block, still counts toward base rate
+        {"symbol": "A", "beat_benchmark_next_block": False},
+    ]
+    result = backtest_trend.summarize_corrected(rows)
+    assert result["n_total_blocks"] == 4
+    assert result["base_rate_beat_benchmark_next_block_pct"] == 50.0  # 2/4, not assumed 50 -- computed
+    assert result["Outperform"]["n"] == 2
+    assert result["Outperform"]["hit_rate_pct"] == 100.0
+
+
+def test_summarize_corrected_handles_no_signaled_blocks():
+    rows = [{"symbol": "A", "beat_benchmark_next_block": True}]  # no label ever assigned (all within deadband)
+    result = backtest_trend.summarize_corrected(rows)
+    assert result["n_total_blocks"] == 1
+    assert "Outperform" not in result and "Underperform" not in result

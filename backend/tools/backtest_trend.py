@@ -51,7 +51,42 @@ DEFAULT_UNIVERSE = [
     "MARUTI", "TITAN", "SUNPHARMA", "TATAMOTORS",
 ]
 
+# Sourced from C:/Antigravity/TradingBot/nifty50.py verbatim. 16 stocks is a
+# small club (real feedback, real point) — this is the widest liquid,
+# well-covered NSE universe already on hand, used to re-check whether the
+# momentum result holds at 3x the sample.
+NIFTY_50 = [
+    "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK",
+    "BAJAJ-AUTO", "BAJFINANCE", "BAJAJFINSV", "BPCL", "BHARTIARTL",
+    "BRITANNIA", "CIPLA", "COALINDIA", "DIVISLAB", "DRREDDY",
+    "EICHERMOT", "GRASIM", "HCLTECH", "HDFCBANK", "HDFCLIFE",
+    "HEROMOTOCO", "HINDALCO", "HINDUNILVR", "ICICIBANK", "ITC",
+    "INDUSINDBK", "INFY", "JSWSTEEL", "KOTAKBANK", "LTIM",
+    "LT", "M&M", "MARUTI", "NTPC", "NESTLEIND",
+    "ONGC", "POWERGRID", "RELIANCE", "SBILIFE", "SBIN",
+    "SUNPHARMA", "TCS", "TATACONSUM", "TATAMOTORS", "TATASTEEL",
+    "TECHM", "TITAN", "ULTRACEMCO", "UPL", "WIPRO",
+]
+
 WINDOWS = (1, 7, 30)  # trading days
+
+# Sourced from C:/Antigravity/TradingBot/strategies/sector_map.py verbatim —
+# reused rather than rebuilt. Needs more members per sector than
+# DEFAULT_UNIVERSE has (IT/ENERGY/TELECOM there only have 1-2 names each),
+# so the sector-relative momentum test uses this wider map instead.
+SECTOR_MAP = {
+    "HDFCBANK": "FINANCIALS", "ICICIBANK": "FINANCIALS", "SBIN": "FINANCIALS", "AXISBANK": "FINANCIALS",
+    "KOTAKBANK": "FINANCIALS", "INDUSINDBK": "FINANCIALS", "BAJFINANCE": "FINANCIALS", "BAJAJFINSV": "FINANCIALS",
+    "HDFCLIFE": "FINANCIALS", "SBILIFE": "FINANCIALS",
+    "TCS": "IT", "INFY": "IT", "HCLTECH": "IT", "TECHM": "IT", "WIPRO": "IT", "LTIM": "IT",
+    "RELIANCE": "ENERGY", "ONGC": "ENERGY", "BPCL": "ENERGY", "COALINDIA": "ENERGY", "NTPC": "ENERGY", "POWERGRID": "ENERGY",
+    "ITC": "FMCG", "HINDUNILVR": "FMCG", "NESTLEIND": "FMCG", "BRITANNIA": "FMCG", "TATACONSUM": "FMCG",
+    "MARUTI": "AUTO", "M&M": "AUTO", "TATAMOTORS": "AUTO", "EICHERMOT": "AUTO", "HEROMOTOCO": "AUTO",
+    "SUNPHARMA": "PHARMA", "DRREDDY": "PHARMA", "CIPLA": "PHARMA", "DIVISLAB": "PHARMA", "APOLLOHOSP": "PHARMA",
+    "TATASTEEL": "METALS", "HINDALCO": "METALS", "JSWSTEEL": "METALS",
+    "LT": "INFRA", "ULTRACEMCO": "INFRA", "GRASIM": "INFRA",
+    "ASIANPAINT": "CONSUMER", "TITAN": "CONSUMER", "BHARTIARTL": "TELECOM",
+}
 
 
 def rsi_series(closes: pd.Series, period: int = 14) -> pd.Series:
@@ -161,33 +196,52 @@ def fetch_index_history(symbol: str = "^NSEI", period: str = "2y") -> pd.DataFra
     return df
 
 
-def backtest_momentum(df: pd.DataFrame, nifty_closes: pd.Series, symbol: str,
-                       lookback: int = 126, deadband_pct: float = 1.0) -> list[dict]:
+def _align(a: pd.Series, b: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """Timezone-naive date alignment, forward-filled onto `a`'s calendar.
+    Shared by every benchmark-relative comparison below (Nifty or a synthetic
+    sector index) — yfinance sometimes returns tz-aware indexes for one series
+    and not the other depending on symbol/exchange."""
+    a_idx = a.index.tz_localize(None) if a.index.tz is not None else a.index
+    b_idx = b.index.tz_localize(None) if b.index.tz is not None else b.index
+    a = pd.Series(a.values, index=a_idx)
+    b = pd.Series(b.values, index=b_idx).reindex(a_idx, method="ffill")
+    return a, b
+
+
+def backtest_momentum(df: pd.DataFrame, benchmark_closes: pd.Series, symbol: str,
+                       lookback: int = 126, deadband_pct: float = 1.0,
+                       volume: pd.Series | None = None, volume_avg_days: int = 20) -> list[dict]:
     """Independent signal, not a filter on classify_trend: has this stock
-    outperformed Nifty over the trailing `lookback` trading days (~6 months at
+    outperformed its benchmark (Nifty, or — see backtest_sector_momentum — its
+    own sector peers) over the trailing `lookback` trading days (~6 months at
     126)? Label Outperform/Underperform, then check the same direction-only
     question as backtest_symbol — does relative momentum predict the stock's
     own future price direction? deadband_pct: skip days where the relative
     momentum is smaller than this, to avoid grading noise near zero as a call.
+
+    volume: if given, only grade a call on days where that day's volume is
+    above its own `volume_avg_days`-day average — tests whether "outperformance
+    on real buying interest" beats outperformance alone.
     """
-    closes = df["Close"]
-    # Align stock and index on date so momentum is compared same-day-to-same-day —
-    # timezone-naive because yfinance sometimes returns tz-aware indexes for one
-    # and not the other depending on symbol/exchange.
-    idx = closes.index.tz_localize(None) if closes.index.tz is not None else closes.index
-    nidx = nifty_closes.index.tz_localize(None) if nifty_closes.index.tz is not None else nifty_closes.index
-    closes = pd.Series(closes.values, index=idx)
-    nifty = pd.Series(nifty_closes.values, index=nidx).reindex(idx, method="ffill")
+    closes, benchmark = _align(df["Close"], benchmark_closes)
 
     stock_mom = closes / closes.shift(lookback) - 1
-    nifty_mom = nifty / nifty.shift(lookback) - 1
-    relative_mom = (stock_mom - nifty_mom) * 100  # percentage points
+    bench_mom = benchmark / benchmark.shift(lookback) - 1
+    relative_mom = (stock_mom - bench_mom) * 100  # percentage points
+
+    vol_confirmed = None
+    if volume is not None:
+        vol_aligned, _ = _align(volume, closes)  # reuse _align just for the tz/reindex logic
+        vol_avg = vol_aligned.rolling(volume_avg_days).mean()
+        vol_confirmed = vol_aligned > vol_avg
 
     rows = []
     n = len(closes)
     for i in range(lookback + 1, n):
         rel = relative_mom.iloc[i]
         if pd.isna(rel) or abs(rel) < deadband_pct:
+            continue
+        if vol_confirmed is not None and (pd.isna(vol_confirmed.iloc[i]) or not vol_confirmed.iloc[i]):
             continue
         direction = "up" if rel > 0 else "down"
         label = "Outperform" if rel > 0 else "Underperform"
@@ -196,6 +250,138 @@ def backtest_momentum(df: pd.DataFrame, nifty_closes: pd.Series, symbol: str,
         row.update(_grade_future(closes, i, n, price_t, direction))
         rows.append(row)
     return rows
+
+
+def build_sector_benchmark(sector_closes: dict[str, pd.Series], exclude_symbol: str) -> pd.Series:
+    """Synthetic equal-weight sector index for one symbol's peers, leave-one-out
+    (excludes the symbol itself, so a stock is never compared against a peer
+    group that includes its own price). Each peer's price is normalized to 1.0
+    at its first available date before averaging, so no single stock's price
+    level dominates the index."""
+    peers = {sym: s for sym, s in sector_closes.items() if sym != exclude_symbol}
+    common_index = None
+    for s in peers.values():
+        common_index = s.index if common_index is None else common_index.union(s.index)
+
+    normalized = []
+    for s in peers.values():
+        s = s.reindex(common_index, method="ffill")
+        normalized.append(s / s.dropna().iloc[0])  # rebase each peer to 1.0 at its own first available close
+    return pd.concat(normalized, axis=1).mean(axis=1)
+
+
+def backtest_momentum_corrected(df: pd.DataFrame, benchmark_closes: pd.Series, symbol: str,
+                                 lookback: int = 126, deadband_pct: float = 1.0) -> list[dict]:
+    """Corrected diagnostic re-test of backtest_momentum(), fixing two flaws
+    found on review of the original result:
+
+    1. RELATIVE grading, not absolute. Outperform/Underperform is a claim
+       about beating the benchmark, so the grade must check whether that
+       outperformance *continued* into the next window — not just whether
+       the stock's raw price went up (which mixes in generic market drift
+       and was shown, by the base-rate check below, to explain most of the
+       original "edge").
+    2. NON-OVERLAPPING sampling. One observation per `lookback`-length block
+       per symbol (both the momentum-formation window and the forward-check
+       window), instead of a fresh row every trading day. Daily-sampled
+       overlapping 126-day-lookback/30-day-forward windows share ~97% of
+       their data day-to-day, which fakes up the sample size and inflates
+       any z-score computed as if the rows were independent.
+
+    This is a confirmatory diagnostic on the same 2-year window already used
+    today, not a decisive test on its own — even corrected, ~16-50 stocks
+    times ~3 non-overlapping blocks each is only 50-150 observations, well
+    below BACKTEST_FINDINGS.md §9's 15-year/48-name/monthly result, which is
+    the one with real statistical power. A null result here means "no
+    detectable edge at this power," not "proven no edge."
+    """
+    closes, benchmark = _align(df["Close"], benchmark_closes)
+    n = len(closes)
+
+    rows = []
+    i = lookback  # first block boundary with a full lookback behind it
+    while i + lookback < n:  # also need a full lookback *ahead* to grade continuation
+        stock_mom = closes.iloc[i] / closes.iloc[i - lookback] - 1
+        bench_mom = benchmark.iloc[i] / benchmark.iloc[i - lookback] - 1
+        rel = (stock_mom - bench_mom) * 100
+
+        future_stock_mom = closes.iloc[i + lookback] / closes.iloc[i] - 1
+        future_bench_mom = benchmark.iloc[i + lookback] / benchmark.iloc[i] - 1
+        future_rel = (future_stock_mom - future_bench_mom) * 100
+
+        if not pd.isna(rel) and not pd.isna(future_rel):
+            row = {"symbol": symbol, "relative_momentum_pp": round(float(rel), 1),
+                   "future_relative_pp": round(float(future_rel), 1),
+                   "beat_benchmark_next_block": bool(future_rel > 0)}
+            if abs(rel) >= deadband_pct:
+                label = "Outperform" if rel > 0 else "Underperform"
+                continued = (future_rel > 0) if rel > 0 else (future_rel < 0)
+                row["label"] = label
+                row["continued"] = bool(continued)
+            rows.append(row)
+        i += lookback  # non-overlapping: jump a full lookback, don't slide by 1 day
+    return rows
+
+
+def summarize_corrected(rows: list[dict]) -> dict:
+    """Reports the corrected hit rate alongside its own matched empirical
+    null (P(beat benchmark in the next block) across *all* blocks, signal or
+    not) — never assumes 50/50, per the null-must-match-grading-type fix."""
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return {"n_total_blocks": 0}
+
+    base_rate = round(100 * df["beat_benchmark_next_block"].astype(bool).mean(), 1)
+    result = {"n_total_blocks": len(df), "base_rate_beat_benchmark_next_block_pct": base_rate}
+
+    if "label" not in df.columns:
+        return result
+    signaled = df.dropna(subset=["label"])
+    for label, group in signaled.groupby("label"):
+        n = len(group)
+        hit_rate = round(100 * group["continued"].astype(bool).mean(), 1) if n else None
+        result[label] = {"n": n, "hit_rate_pct": hit_rate}
+    return result
+
+
+def run_momentum_corrected(symbols: list[str], lookback: int = 126) -> dict:
+    nifty_closes = fetch_index_history()["Close"]
+    all_rows = []
+    for symbol in symbols:
+        try:
+            df = pricing.fetch_daily_history(symbol, "NSE", period="2y")
+        except ValueError as e:
+            print(f"  skipping {symbol}: {e}", file=sys.stderr)
+            continue
+        all_rows.extend(backtest_momentum_corrected(df, nifty_closes, symbol, lookback=lookback))
+    return summarize_corrected(all_rows)
+
+
+def run_sector_momentum_corrected(sector_map: dict[str, str], lookback: int = 126, min_peers: int = 2) -> dict:
+    closes_by_symbol: dict[str, pd.Series] = {}
+    for symbol in sorted(sector_map):
+        try:
+            df = pricing.fetch_daily_history(symbol, "NSE", period="2y")
+        except ValueError as e:
+            print(f"  skipping {symbol}: {e}", file=sys.stderr)
+            continue
+        closes_by_symbol[symbol] = df["Close"]
+
+    by_sector: dict[str, dict[str, pd.Series]] = {}
+    for symbol, sector in sector_map.items():
+        if symbol in closes_by_symbol:
+            by_sector.setdefault(sector, {})[symbol] = closes_by_symbol[symbol]
+
+    all_rows = []
+    for sector, members in by_sector.items():
+        if len(members) < min_peers + 1:
+            print(f"  skipping sector {sector}: only {len(members)} symbol(s) in universe", file=sys.stderr)
+            continue
+        for symbol, closes in members.items():
+            benchmark = build_sector_benchmark(members, exclude_symbol=symbol)
+            df = pd.DataFrame({"Close": closes})
+            all_rows.extend(backtest_momentum_corrected(df, benchmark, symbol, lookback=lookback))
+    return summarize_corrected(all_rows)
 
 
 def summarize(rows: list[dict]) -> pd.DataFrame:
@@ -230,7 +416,7 @@ def run(symbols: list[str], adx_gate: float | None = None,
     return summarize(all_rows)
 
 
-def run_momentum(symbols: list[str], lookback: int = 126) -> pd.DataFrame:
+def run_momentum(symbols: list[str], lookback: int = 126, volume_confirm: bool = False) -> pd.DataFrame:
     nifty_df = fetch_index_history()
     nifty_closes = nifty_df["Close"]
     all_rows = []
@@ -240,7 +426,39 @@ def run_momentum(symbols: list[str], lookback: int = 126) -> pd.DataFrame:
         except ValueError as e:
             print(f"  skipping {symbol}: {e}", file=sys.stderr)
             continue
-        all_rows.extend(backtest_momentum(df, nifty_closes, symbol, lookback=lookback))
+        volume = df["Volume"] if volume_confirm and "Volume" in df.columns else None
+        all_rows.extend(backtest_momentum(df, nifty_closes, symbol, lookback=lookback, volume=volume))
+    return summarize(all_rows)
+
+
+def run_sector_momentum(sector_map: dict[str, str], lookback: int = 126, min_peers: int = 2) -> pd.DataFrame:
+    """Same momentum test as run_momentum, but benchmarked against each
+    symbol's own sector peers (leave-one-out) instead of the whole-market
+    Nifty index — reuses backtest_momentum unchanged, just swapping the
+    benchmark series."""
+    closes_by_symbol: dict[str, pd.Series] = {}
+    for symbol in sorted(sector_map):
+        try:
+            df = pricing.fetch_daily_history(symbol, "NSE", period="2y")
+        except ValueError as e:
+            print(f"  skipping {symbol}: {e}", file=sys.stderr)
+            continue
+        closes_by_symbol[symbol] = df["Close"]
+
+    by_sector: dict[str, dict[str, pd.Series]] = {}
+    for symbol, sector in sector_map.items():
+        if symbol in closes_by_symbol:
+            by_sector.setdefault(sector, {})[symbol] = closes_by_symbol[symbol]
+
+    all_rows = []
+    for sector, members in by_sector.items():
+        if len(members) < min_peers + 1:  # need at least min_peers *other* stocks
+            print(f"  skipping sector {sector}: only {len(members)} symbol(s) in universe", file=sys.stderr)
+            continue
+        for symbol, closes in members.items():
+            benchmark = build_sector_benchmark(members, exclude_symbol=symbol)
+            df = pd.DataFrame({"Close": closes})
+            all_rows.extend(backtest_momentum(df, benchmark, symbol, lookback=lookback))
     return summarize(all_rows)
 
 
@@ -261,3 +479,15 @@ if __name__ == "__main__":
 
     print("\n=== RELATIVE MOMENTUM vs NIFTY 50 (independent signal, 6-month lookback) ===")
     print(run_momentum(symbols).to_string(index=False))
+
+    print("\n=== RELATIVE MOMENTUM vs NIFTY 50 + VOLUME CONFIRMATION (above 20d avg volume) ===")
+    print(run_momentum(symbols, volume_confirm=True).to_string(index=False))
+
+    print(f"\n=== SECTOR-RELATIVE MOMENTUM (leave-one-out peer benchmark, {len(SECTOR_MAP)} symbols) ===")
+    print(run_sector_momentum(SECTOR_MAP).to_string(index=False))
+
+    print("\n=== CORRECTED DIAGNOSTIC: relative grading + non-overlapping blocks (confirmatory, not decisive) ===")
+    print("--- vs Nifty 50 ---")
+    print(run_momentum_corrected(symbols))
+    print("--- sector-relative ---")
+    print(run_sector_momentum_corrected(SECTOR_MAP))

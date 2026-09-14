@@ -42,7 +42,7 @@ services:
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
       EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY:-}
       ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
     ports:
       - "8001:8000"
     depends_on:
@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app/backend
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
   # Next.js Frontend
   frontend:
