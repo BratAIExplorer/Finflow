@@ -1,5 +1,33 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🐛 Regression Fixed: CORS/localhost:8000 on Live Site — Sep 14, 2026
+The VPS redeploy above (theme-engine fix) introduced a real regression:
+merging `main`'s `frontend/Dockerfile` wholesale dropped the
+`ARG NEXT_PUBLIC_API_URL` / `ENV` wiring the old Dockerfile had. Since
+Next.js inlines `NEXT_PUBLIC_*` vars at **build time**, every component
+(`portfolio/page.tsx`, `BrokerSettings`, `LoginModal`, `HoldingsTable`,
+`MarketBoardPanel`, `NewsPanel`) silently fell back to its
+`http://localhost:8000` default — breaking every API call on the live site
+with `CORS policy: No 'Access-Control-Allow-Origin' header` errors, since
+the browser was trying to reach `localhost` instead of
+`https://finflow.fortressintelligence.space/api`.
+
+**Fix**: restored the two missing lines in `frontend/Dockerfile`'s builder
+stage (`ARG NEXT_PUBLIC_API_URL` + `ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}`)
+so `docker-compose.yml`'s existing build arg actually reaches the build.
+Verified locally (built bundle has zero `localhost:8000` occurrences, real
+URL present) and on the live container (`docker exec finflow-frontend grep`
+— 0 `localhost:8000`, 4 files with the correct origin) before calling it
+done. Pushed as `7249a9c` on `main`, redeployed to the VPS.
+
+**Lesson**: when a merge conflict resolution replaces a whole file (not a
+targeted patch), diff the old and new versions for *behavior*, not just
+"does it look more complete" — the newer Dockerfile looked like a strict
+upgrade (multi-stage, non-root user, standalone output) but silently
+dropped a load-bearing build arg the old one had. Worth an explicit
+post-merge smoke test against the deployed environment's actual origin,
+not just `tsc`/`build` succeeding.
+
 ## 🚀 VPS Deploy Drift Fixed: Theme Engine Now Actually Live — Sep 14, 2026
 Discovered the Light/Dark toggle documented as "done" (see below) had never
 reached the live site, because three copies of the frontend had silently

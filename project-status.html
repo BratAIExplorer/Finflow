@@ -38,10 +38,14 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-14 08:04 UTC &middot; branch <code>feature/market-board-tab</code> &middot;
-commit <code>7095d4e</code> &middot; fix(mstock): harden token extraction, fix test mock, and update project-status.html</div>
+<div class="meta">Generated 2026-09-14 08:14 UTC &middot; branch <code>main</code> &middot;
+commit <code>7249a9c</code> &middot; fix(frontend): restore NEXT_PUBLIC_API_URL build arg in Dockerfile</div>
 </header>
 <section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
+<h2>🐛 Regression Fixed: CORS/localhost:8000 on Live Site — Sep 14, 2026</h2>
+<p>The VPS redeploy above (theme-engine fix) introduced a real regression: merging <code>main</code>&#x27;s <code>frontend/Dockerfile</code> wholesale dropped the <code>ARG NEXT_PUBLIC_API_URL</code> / <code>ENV</code> wiring the old Dockerfile had. Since Next.js inlines <code>NEXT_PUBLIC_*</code> vars at <strong>build time</strong>, every component (<code>portfolio/page.tsx</code>, <code>BrokerSettings</code>, <code>LoginModal</code>, <code>HoldingsTable</code>, <code>MarketBoardPanel</code>, <code>NewsPanel</code>) silently fell back to its <code>http://localhost:8000</code> default — breaking every API call on the live site with <code>CORS policy: No &#x27;Access-Control-Allow-Origin&#x27; header</code> errors, since the browser was trying to reach <code>localhost</code> instead of <code>https://finflow.fortressintelligence.space/api</code>.</p>
+<p><strong>Fix</strong>: restored the two missing lines in <code>frontend/Dockerfile</code>&#x27;s builder stage (<code>ARG NEXT_PUBLIC_API_URL</code> + <code>ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}</code>) so <code>docker-compose.yml</code>&#x27;s existing build arg actually reaches the build. Verified locally (built bundle has zero <code>localhost:8000</code> occurrences, real URL present) and on the live container (<code>docker exec finflow-frontend grep</code> — 0 <code>localhost:8000</code>, 4 files with the correct origin) before calling it done. Pushed as <code>7249a9c</code> on <code>main</code>, redeployed to the VPS.</p>
+<p><strong>Lesson</strong>: when a merge conflict resolution replaces a whole file (not a targeted patch), diff the old and new versions for *behavior*, not just &quot;does it look more complete&quot; — the newer Dockerfile looked like a strict upgrade (multi-stage, non-root user, standalone output) but silently dropped a load-bearing build arg the old one had. Worth an explicit post-merge smoke test against the deployed environment&#x27;s actual origin, not just <code>tsc</code>/<code>build</code> succeeding.</p>
 <h2>🚀 VPS Deploy Drift Fixed: Theme Engine Now Actually Live — Sep 14, 2026</h2>
 <p>Discovered the Light/Dark toggle documented as &quot;done&quot; (see below) had never reached the live site, because three copies of the frontend had silently diverged:</p>
 <ul>
