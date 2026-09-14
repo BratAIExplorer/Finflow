@@ -85,6 +85,15 @@ class MStockConnector(BrokerConnector):
                         "totp_secret isn't valid base32 (letters A-Z and digits 2-7 only). "
                         "Re-check the value shown on mStock's TOTP setup page."
                     )
+                
+                # mStock often returns 502 Bad Gateway on /verifytotp if /login wasn't called first
+                login_resp = client.post(
+                    LOGIN_URL,
+                    headers=headers,
+                    data={"username": username, "password": password},
+                )
+                login_resp.raise_for_status()
+
                 verify_resp = client.post(
                     VERIFY_TOTP_URL,
                     headers=headers,
@@ -147,8 +156,7 @@ class MStockConnector(BrokerConnector):
         api_key = self.credentials["api_key"]
         headers = {
             "X-Mirae-Version": "1",
-            "Authorization": f"Bearer {self.session_state['access_token']}",
-            "X-PrivateKey": api_key,
+            "Authorization": f"token {api_key}:{self.session_state['access_token']}",
         }
         try:
             with httpx.Client(timeout=15) as client:

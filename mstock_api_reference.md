@@ -45,4 +45,5 @@
 
 ### Important Quirks
 - **Tokens expire daily**: Tokens are valid until 12:00 AM of the generated day.
-- **Header discrepancies**: Type A endpoints typically expect `Authorization: token <api_key>:<token>` whereas Type B endpoints (like Portfolio) expect `Authorization: Bearer <jwtToken>` and `X-PrivateKey: <api_key>`.
+- **Header discrepancies**: Type A endpoints (like Fund Summary) expect `Authorization: token <api_key>:<token>` whereas Type B endpoints (like Portfolio) expect `Authorization: Bearer <jwtToken>` and `X-PrivateKey: <api_key>`.
+- **502 Bad Gateway on TOTP**: Although TOTP accounts do not require an OTP from the `/login` endpoint, hitting `/verifytotp` completely cold can often result in a `502 Bad Gateway`. To bypass this, call `/connect/login` with your username and password first to initialize session state on their end, and then call `/verifytotp` on the same connection.
