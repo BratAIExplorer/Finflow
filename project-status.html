@@ -38,10 +38,97 @@ hr { border: 0; border-top: 1px solid #1e293b; margin: 24px 0; }
 </style></head><body><div class="wrap">
 <header>
 <h1>FinFlow — Project Status</h1>
-<div class="meta">Generated 2026-09-13 14:27 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
-commit <code>5925a4c</code> &middot; feat: senior-friendly UI redesign, mStock sync fixes, and startup script</div>
+<div class="meta">Generated 2026-09-14 01:40 UTC &middot; branch <code>feature/ui-redesign-and-mstock-fixes</code> &middot;
+commit <code>6268e31</code> &middot; feat: Portfolio as full page with Summary/Holdings/News tabs</div>
 </header>
-<section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 10, 2026)</h1>
+<section><div class="src">CURRENT_STATUS.md</div><h1>FinFlow Current Status (Updated: Sep 14, 2026)</h1>
+<h2>📈 Trend accuracy tracking (NEW) — Sep 14, 2026</h2>
+<p>Dad decides buy/sell based on the Bullish/Bearish trend label, but until now only the *latest* label was ever stored — no way to check if a past call was right. Added:</p>
+<ul>
+<li><strong><code>trend_snapshots</code> table</strong> (<code>backend/models.py</code>): one row per holding per</li>
+</ul>
+<p>  day — label, RSI/MACD, price at capture, and hit/miss outcome columns for   1-day, 7-day, and 30-day windows (null = still pending).</p>
+<ul>
+<li><strong><code>backend/jobs/trend_snapshot.py</code></strong>: <code>snapshot_all_holdings()</code> records</li>
+</ul>
+<p>  today&#x27;s call for every held stock (reuses the existing   <code>pricing.compute_signals</code>/<code>classify_trend</code> — no new price logic);   <code>grade_pending_snapshots()</code> checks due windows against the current price   and marks hit/miss by direction only (Bullish = hit if price rose,   Bearish = hit if it fell; Neutral is never graded).</p>
+<ul>
+<li><strong>Scheduled via in-process APScheduler</strong> (<code>backend/main.py</code>, started in the</li>
+</ul>
+<p>  existing <code>on_startup</code> hook), daily at 16:00 IST — chosen over VPS crontab   since it ships inside the container automatically, no host-side setup   needed on the shared Hostinger box.</p>
+<ul>
+<li><strong>New endpoint</strong>: <code>GET /holdings/{id}/trend-history</code> — same ownership</li>
+</ul>
+<p>  check as <code>PATCH /holdings/positions/{id}</code>, returns the stored snapshots.</p>
+<ul>
+<li>Not built yet (deliberately, per the plan): no frontend accuracy widget —</li>
+</ul>
+<p>  needs a few weeks of real data first — and no change to the trend   labeling rules themselves.</p>
+<ul>
+<li>Tests: <code>backend/tests/test_trend_snapshot.py</code> (6 tests, offline/mocked).</li>
+</ul>
+<p>  Full suite: 25/26 passing (<code>test_mstock_fetch_holdings_parses_and_filters_zero_qty</code>   fails, pre-existing and unrelated — see the mStock 502 issue already noted   from the prior session, not touched here).</p>
+<h2>📄 Portfolio: modal → full page, + News tab — Sep 14, 2026</h2>
+<p>Portfolio was a fullscreen overlay modal opened from the nav (<code>HoldingsDashboard.tsx</code>). Replaced with a real route:</p>
+<ul>
+<li><strong><code>frontend/app/portfolio/page.tsx</code></strong> — a proper Next.js page at <code>/portfolio</code></li>
+</ul>
+<p>  with Summary / Holdings / News tabs. Redirects to <code>/</code> if not logged in.   <code>HoldingsDashboard.tsx</code> (the old modal) deleted — nothing else referenced it.</p>
+<ul>
+<li><strong>News tab</strong>: per-holding headlines via Google News RSS, ported from</li>
+</ul>
+<p>  <code>C:\Antigravity\Deepaks-Bots\news.py</code> (material-news keyword tagging +   pos/neg/neutral sentiment). New backend route <code>backend/routers/news.py</code>   (<code>GET /news/</code>), registered in <code>main.py</code>. Added <code>feedparser</code> to   <code>requirements.txt</code>. Unlike the bot&#x27;s poller, this is a stateless GET —   no <code>seen.sqlite</code> dedup, it just returns current top headlines per holding   on every call.</p>
+<ul>
+<li>Verified: TS typecheck clean, backend router imports clean, unauthenticated</li>
+</ul>
+<p>  <code>/portfolio</code> redirects to <code>/</code>, authenticated page renders all 3 tabs, and   the news fetch was confirmed live against the real portfolio&#x27;s 16 holdings   (Google News RSS returned real headlines).</p>
+<h2>🧓 Senior-friendly Holdings redesign — Sep 14, 2026</h2>
+<p>The Holdings tab was a data table pinned to <code>min-w-[1400px]</code> — 11 columns, guaranteed horizontal scroll on any laptop, small low-contrast secondary text. Replaced with a compact expandable row list per stock:</p>
+<ul>
+<li><strong>Always visible</strong>: stock, broker, owner, shares, buy price, current</li>
+</ul>
+<p>  price, gain/loss — no sideways scrolling, no matter how many stocks.</p>
+<ul>
+<li><strong>Tap a row</strong> to reveal RSI, MACD, trend, 52-week range, and flags —</li>
+</ul>
+<p>  detail is one tap away instead of a mandatory extra 6 columns.</p>
+<ul>
+<li>Held-duration shows a plain day count (<code>held 1187 days</code>) — simplified</li>
+</ul>
+<p>  from an earlier <code>Xy Yd</code> / <code>X years Y months</code> attempt per user feedback   (&quot;just number of days held&quot;).</p>
+<ul>
+<li>Validated against a 20+ multi-broker mock portfolio scenario before</li>
+</ul>
+<p>  building — a full-card-per-stock layout was considered and rejected   because it doesn&#x27;t scan quickly at that volume; the tap-to-expand row   keeps scanning fast while eliminating horizontal scroll entirely.</p>
+<ul>
+<li>Fixed a real <code>.gitignore</code> bug found in the process: a bare <code>lib/</code> rule</li>
+</ul>
+<p>  (meant for Python venvs) was silently excluding <code>frontend/lib/</code> — real   TypeScript source that had never once been committed to git.</p>
+<h2>🌐 LIVE ON VPS</h2>
+<p>Deployed and QA-verified on Hostinger VPS <code>76.13.179.32</code> (shared box, also runs Kyro/dealzoda/smartnri — used non-conflicting ports):</p>
+<ul>
+<li><strong>App (what Dad opens)</strong>: <code>https://finflow.fortressintelligence.space</code> — real HTTPS, free Let&#x27;s Encrypt cert via certbot, auto-renews. DNS: A record <code>finflow</code> → <code>76.13.179.32</code> on the <code>fortressintelligence.space</code> Namecheap zone (added 2026-09-13).</li>
+<li>Old bare-IP links (<code>http://76.13.179.32:3001</code> / <code>:8001</code>) still work directly but skip HTTPS — use the domain instead.</li>
+<li>nginx reverse-proxies <code>/</code> → frontend container (3001) and <code>/api/</code> → backend container (8001), both container-internal now; only 80/443 are meant to be used externally.</li>
+<li>Secrets (<code>SECRET_KEY</code>, <code>APP_ENCRYPTION_KEY</code>, DB password) live only in <code>/opt/FinFlow/.env</code> on the VPS — not committed to git, not in this repo.</li>
+<li>Postgres and Redis are container-internal only (no public port) — fixed during this deploy, they were originally exposed to the whole internet with no password.</li>
+</ul>
+<h3>Bugs fixed during deployment (would have blocked Dad from ever logging in)</h3>
+<p>1. <code>docker-compose.yml</code> bind-mounted the frontend source over the built container image, hiding <code>node_modules</code>/<code>.next</code> — container crash-looped on every restart. 2. <code>bcrypt</code> 4.1+ broke <code>passlib</code>&#x27;s internal self-test, so <code>/auth/register</code> 500&#x27;d on every signup. Pinned <code>bcrypt==4.0.1</code> in <code>requirements.txt</code>. 3. <code>NEXT_PUBLIC_API_URL</code> wasn&#x27;t passed as a Docker build arg, so the browser bundle would have pointed at <code>localhost:8000</code> instead of the real backend.</p>
+<h2>🔒 Security Audit — Sep 13, 2026 (signed off)</h2>
+<p>Live-tested against the deployed VPS, not just read from source:</p>
+<ul>
+<li><strong>IDOR</strong>: registered two real test accounts, confirmed user B gets <code>404</code>/<code>[]</code> trying to read, PATCH, or DELETE user A&#x27;s broker account/holdings by guessing IDs. Every route in <code>holdings.py</code>, <code>assets.py</code>, <code>family.py</code> requires <code>get_current_user</code> and filters by <code>current_user.id</code>.</li>
+<li><strong>Auth bypass</strong>: no-token request to a protected route → <code>401</code>. Confirmed.</li>
+<li><strong>SQL injection</strong>: probed the login form with a classic <code>&#x27; OR &#x27;1&#x27;=&#x27;1</code> payload — SQLAlchemy ORM parameterizes everything, no effect.</li>
+<li><strong>Weak passwords (found + fixed)</strong>: server accepted <code>&quot;1234&quot;</code> via direct API call — the 8-char minimum was frontend-only. Added a server-side check in <code>backend/routers/auth.py</code>; now returns <code>422</code>.</li>
+<li><strong>Brute force (found + fixed)</strong>: no limit on failed logins. Added an in-memory 5-attempts/5-minute lockout per email (<code>429</code> after 5 fails) — <code>ponytail: single-worker in-memory lockout, move to Redis if this ever runs multi-worker</code>.</li>
+<li><strong>Secrets</strong>: <code>SECRET_KEY</code>, <code>APP_ENCRYPTION_KEY</code>, DB password are random-generated, live only in the VPS&#x27;s <code>/opt/FinFlow/.env</code>, never committed.</li>
+<li><strong>Network exposure</strong>: Postgres and Redis are container-internal only (fixed this session — both were previously bound to <code>0.0.0.0</code> with no auth, reachable from the open internet).</li>
+<li><strong>Transport</strong>: real HTTPS via Let&#x27;s Encrypt on <code>finflow.fortressintelligence.space</code>, nginx reverse proxy, HTTP→HTTPS redirect.</li>
+<li><strong>Fixed (Sep 13, 2026 follow-up)</strong>: <code>/docs</code> and <code>/redoc</code> are now disabled unless <code>ENVIRONMENT=development</code> is set (defaults to off — the VPS doesn&#x27;t set this, so prod stays locked). <code>CORS allow_origins</code> now reads from <code>ALLOWED_ORIGINS</code> env var, defaulting to <code>https://finflow.fortressintelligence.space</code> instead of <code>*</code>. See <code>backend/main.py</code>.</li>
+<li><strong>Explicitly rejected</strong>: a suggestion (from a separate parallel session) to copy the <code>.env</code> secrets and SQLite DB to Dad&#x27;s laptop for a local install. Don&#x27;t do this — it relocates the broker-credential encryption key onto a second, less-controlled machine and defeats the point of the hosted URL. See the walkthrough note in this session&#x27;s transcript for the reasoning.</li>
+</ul>
 <h2>✅ Completed</h2>
 <ul>
 <li><strong>Architecture</strong>: Decoupled multi-product architecture finalized.</li>
@@ -65,14 +152,21 @@ commit <code>5925a4c</code> &middot; feat: senior-friendly UI redesign, mStock s
 <li><strong>Manual Forms</strong>: Asset entry forms for Insurance and Loans.</li>
 </ul>
 <h2>⏳ Next Up</h2>
-<p>1. <strong>Latest company news</strong>: section on the holdings screen — needs a news feed + a backend endpoint (not built). 2. Decide storage: local SQLite is fine for now; move to Postgres on the VPS before multi-device or historical tracking (there is no price history table yet — only the latest snapshot per holding). 3. Commit the untracked broker + holdings + login files. 4. <strong>Portfolio Connectors</strong>: read-only API integration for Binance and Luno. 5. <strong>Family Roll-up</strong>: combined net-worth views for family accounts.</p>
+<p>1. <strong>Trend accuracy widget</strong>: surface <code>GET /holdings/{id}/trend-history</code> on the    dashboard (e.g. &quot;Very Bullish called right 6/9 times&quot;) — data pipeline is    built (see above), needs a few weeks of real snapshots before it&#x27;s meaningful. 2. Commit the untracked broker + holdings + login files. 3. <strong>Portfolio Connectors</strong>: read-only API integration for Binance and Luno. 5. <strong>Family Roll-up</strong>: combined net-worth views for family accounts.</p>
 <h2>🚧 Blockers</h2>
 <ul>
 <li><strong>Zerodha credentials</strong>: backend + frontend built and tested with mock data, but nothing has touched a real Zerodha account yet.</li>
 <li><strong>API Keys</strong>: need personal read-only keys for Binance/Luno real-data testing.</li>
 </ul>
 <h2>💡 Ecosystem Note</h2>
-<p>The <strong>ARUN Trading Bot</strong> is now a separate standalone project. FinFlow will eventually integrate with it via a read-only database connection to show &quot;Bot Managed&quot; assets in the total net worth view.</p></section><section><div class="src">VERIFIED_STATUS.md</div><h1>FinFlow — Verified Status (2026-07-03, holdings dashboard 2026-09-10)</h1>
+<p>The <strong>ARUN Trading Bot</strong> is now a separate standalone project. FinFlow will eventually integrate with it via a read-only database connection to show &quot;Bot Managed&quot; assets in the total net worth view.</p>
+<h3>Recent Updates (Sep 13, 2026)</h3>
+<ul>
+<li><strong>UI/UX Refinements</strong>: Enlarged fonts across the Summary panel and made the UI more senior-citizen friendly. Simplified owner name displays (e.g. converting emails to first names).</li>
+<li><strong>mStock Integration</strong>: Added fetching for Cash Balance from the Type A /fundsummary endpoint and displayed it as a top-level KPI on the Dashboard.</li>
+<li><strong>Holdings Improvements</strong>: Corrected purchase date assignment.</li>
+</ul></section><section><div class="src">VERIFIED_STATUS.md</div><p>&gt; <strong>This is a point-in-time local-dev verification log (Jul–Sep 2026).</strong> For the current live deployment (VPS, HTTPS URL, security audit), see <a href="CURRENT_STATUS.md">CURRENT_STATUS.md</a> instead — it&#x27;s live now, &quot;Deploy: when ready&quot; below is done.</p>
+<h1>FinFlow — Verified Status (2026-07-03, holdings dashboard 2026-09-10)</h1>
 <h2>✅ Verified 2026-09-10 — Holdings dashboard + login (mock data)</h2>
 <p>Run against local SQLite seeded with mock data: 1 user, <strong>3 broker accounts (2 Zerodha + 1 mStock)</strong>, 7 holdings. Mock data cleared after the run.</p>
 <ul>

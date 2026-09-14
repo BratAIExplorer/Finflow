@@ -118,3 +118,32 @@ class Holding(Base):
     macd_hist = Column(Float, nullable=True)  # MACD line minus signal line; sign+magnitude drives the trend label
 
     plugin = relationship("UserPlugin", back_populates="holdings")
+
+
+class TrendSnapshot(Base):
+    """One recorded trend call for a holding, taken by the daily end-of-day job
+    (backend/jobs/trend_snapshot.py). Exists so we can later check whether a
+    Bullish/Bearish label actually predicted the price move, instead of only
+    ever seeing the latest label like Holding does."""
+    __tablename__ = "trend_snapshots"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    holding_id = Column(String, ForeignKey("holdings.id"))
+    symbol = Column(String)    # denormalized, same reasoning as Holding.user_id
+    exchange = Column(String)  # survives the holding row being deleted/re-created on re-sync
+
+    captured_at = Column(DateTime, default=func.now())
+    price_at_capture = Column(Float)
+    rsi_14 = Column(Float, nullable=True)
+    macd_hist = Column(Float, nullable=True)
+    trend_label = Column(String)     # "Very Bullish" | "Bullish" | "Neutral" | "Bearish" | "Very Bearish" | "Unknown"
+    direction = Column(String)       # "up" | "down" | "flat", from classify_trend()
+
+    # Graded by grade_pending_snapshots() once each window has elapsed.
+    # hit_* is null = pending, true/false once graded. "flat" (Neutral) snapshots
+    # are never graded — there's no direction to check against.
+    price_1d = Column(Float, nullable=True)
+    hit_1d = Column(Boolean, nullable=True)
+    price_7d = Column(Float, nullable=True)
+    hit_7d = Column(Boolean, nullable=True)
+    price_30d = Column(Float, nullable=True)
+    hit_30d = Column(Boolean, nullable=True)

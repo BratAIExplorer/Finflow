@@ -13,6 +13,7 @@ httpx>=0.26.0
 redis>=5.0.1
 cryptography>=41.0.7
 python-dotenv>=1.0.0
+apscheduler>=3.10.4
 
 # Broker holdings dashboard (mStock + Zerodha connectors)
 pyotp>=2.9.0

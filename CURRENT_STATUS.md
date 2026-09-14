@@ -1,5 +1,32 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 📈 Trend accuracy tracking (NEW) — Sep 14, 2026
+Dad decides buy/sell based on the Bullish/Bearish trend label, but until now
+only the *latest* label was ever stored — no way to check if a past call was
+right. Added:
+- **`trend_snapshots` table** (`backend/models.py`): one row per holding per
+  day — label, RSI/MACD, price at capture, and hit/miss outcome columns for
+  1-day, 7-day, and 30-day windows (null = still pending).
+- **`backend/jobs/trend_snapshot.py`**: `snapshot_all_holdings()` records
+  today's call for every held stock (reuses the existing
+  `pricing.compute_signals`/`classify_trend` — no new price logic);
+  `grade_pending_snapshots()` checks due windows against the current price
+  and marks hit/miss by direction only (Bullish = hit if price rose,
+  Bearish = hit if it fell; Neutral is never graded).
+- **Scheduled via in-process APScheduler** (`backend/main.py`, started in the
+  existing `on_startup` hook), daily at 16:00 IST — chosen over VPS crontab
+  since it ships inside the container automatically, no host-side setup
+  needed on the shared Hostinger box.
+- **New endpoint**: `GET /holdings/{id}/trend-history` — same ownership
+  check as `PATCH /holdings/positions/{id}`, returns the stored snapshots.
+- Not built yet (deliberately, per the plan): no frontend accuracy widget —
+  needs a few weeks of real data first — and no change to the trend
+  labeling rules themselves.
+- Tests: `backend/tests/test_trend_snapshot.py` (6 tests, offline/mocked).
+  Full suite: 25/26 passing (`test_mstock_fetch_holdings_parses_and_filters_zero_qty`
+  fails, pre-existing and unrelated — see the mStock 502 issue already noted
+  from the prior session, not touched here).
+
 ## 📄 Portfolio: modal → full page, + News tab — Sep 14, 2026
 Portfolio was a fullscreen overlay modal opened from the nav (`HoldingsDashboard.tsx`).
 Replaced with a real route:
@@ -84,10 +111,11 @@ Live-tested against the deployed VPS, not just read from source:
 - **Manual Forms**: Asset entry forms for Insurance and Loans.
 
 ## ⏳ Next Up
-1. **Latest company news**: section on the holdings screen — needs a news feed + a backend endpoint (not built).
-2. Decide storage: local SQLite is fine for now; move to Postgres on the VPS before multi-device or historical tracking (there is no price history table yet — only the latest snapshot per holding).
-3. Commit the untracked broker + holdings + login files.
-4. **Portfolio Connectors**: read-only API integration for Binance and Luno.
+1. **Trend accuracy widget**: surface `GET /holdings/{id}/trend-history` on the
+   dashboard (e.g. "Very Bullish called right 6/9 times") — data pipeline is
+   built (see above), needs a few weeks of real snapshots before it's meaningful.
+2. Commit the untracked broker + holdings + login files.
+3. **Portfolio Connectors**: read-only API integration for Binance and Luno.
 5. **Family Roll-up**: combined net-worth views for family accounts.
 
 ## 🚧 Blockers

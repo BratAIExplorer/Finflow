@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from ..database import get_db
-from ..models import User, UserPlugin, Holding
+from ..models import User, UserPlugin, Holding, TrendSnapshot
 from ..crypto_utils import encrypt_credentials, decrypt_credentials
 from ..brokers.base import BrokerConnectionError
 from ..brokers.mstock import MStockConnector
@@ -271,6 +271,34 @@ class PositionUpdate(BaseModel):
     # purchase date, so the user sets it here to activate the holding-period
     # / long-term-tax flags.
     first_buy_date: Optional[str] = None
+
+
+@router.get("/{holding_id}/trend-history")
+def get_trend_history(holding_id: str,
+                       current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    holding = (
+        db.query(Holding)
+        .filter(Holding.id == holding_id, Holding.user_id == current_user.id)
+        .first()
+    )
+    if not holding:
+        raise HTTPException(status_code=404, detail="Holding not found")
+
+    snapshots = (
+        db.query(TrendSnapshot)
+        .filter(TrendSnapshot.holding_id == holding_id)
+        .order_by(TrendSnapshot.captured_at.asc())
+        .all()
+    )
+    return [{
+        "captured_at": s.captured_at,
+        "price_at_capture": s.price_at_capture,
+        "trend_label": s.trend_label,
+        "direction": s.direction,
+        "hit_1d": s.hit_1d,
+        "hit_7d": s.hit_7d,
+        "hit_30d": s.hit_30d,
+    } for s in snapshots]
 
 
 @router.patch("/positions/{holding_id}")
