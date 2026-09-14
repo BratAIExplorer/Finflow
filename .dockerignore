@@ -1,0 +1,46 @@
+# Build artifacts
+.next
+node_modules
+dist
+build
+*.o
+*.so
+*.a
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.tox
+.venv
+venv
+
+# Development
+.git
+.gitignore
+.env.local
+.env.*.local
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Large cache/archive files
+graphify-out
+*.tar
+*.tar.gz
+*.zip
+finflow_deploy.tar
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Database/Data
+finflow_dev.db
+*.sqlite
+*.sqlite3

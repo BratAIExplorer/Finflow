@@ -173,6 +173,28 @@ def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
     assert connector.session_state["access_token"] == "fake-jwt"
 
 
+def test_mstock_fetch_funds_sums_segments_from_list_response(monkeypatch):
+    """Confirmed live shape (Sep 2026): 'data' is a list of per-segment dicts,
+    not a single dict — fetch_funds must sum AVAILABLE_BALANCE across them."""
+    from datetime import datetime
+    from backend.brokers import mstock
+
+    funds_resp = _FakeResponse({
+        "data": [
+            {"SEG": "CAPITAL", "AVAILABLE_BALANCE": "246967.77"},
+            {"SEG": "COMMODITY", "AVAILABLE_BALANCE": "1000.00"},
+        ]
+    })
+    fake_client = _FakeClient([funds_resp])
+    monkeypatch.setattr(mstock.httpx, "Client", lambda timeout=15: fake_client)
+
+    connector = mstock.MStockConnector(
+        {"api_key": "k", "username": "u", "password": "p", "totp_secret": "s"},
+        session_state={"access_token": "cached-jwt", "access_token_date": datetime.now().date().isoformat()},
+    )
+    assert connector.fetch_funds() == pytest.approx(247967.77)
+
+
 def test_mstock_skips_totp_when_session_state_is_fresh(monkeypatch):
     from datetime import datetime
     from backend.brokers import mstock

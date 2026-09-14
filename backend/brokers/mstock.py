@@ -262,6 +262,7 @@ class MStockConnector(BrokerConnector):
         headers = {
             "X-Mirae-Version": "1",
             "Authorization": f"token {api_key}:{self.session_state['access_token']}",
+            "X-PrivateKey": api_key,
         }
         try:
             with httpx.Client(timeout=15) as client:
@@ -271,10 +272,18 @@ class MStockConnector(BrokerConnector):
         except httpx.HTTPError as e:
             raise BrokerConnectionError(f"mStock funds fetch failed: {e}") from e
 
-        data = payload.get("data", {})
-        # The key we found earlier is AVAILABLE_BALANCE
-        balance_str = data.get("AVAILABLE_BALANCE", "0")
-        try:
-            return float(balance_str)
-        except ValueError:
-            return 0.0
+        data = payload.get("data", [])
+        # Confirmed shape (live payload, Sep 2026): a list with one dict per
+        # trading segment (e.g. SEG "CAPITAL", possibly others like commodity/
+        # F&O) — sum AVAILABLE_BALANCE across segments for total cash.
+        if isinstance(data, dict):
+            data = [data]  # tolerate a single-object response too
+        total = 0.0
+        for segment in data:
+            if not isinstance(segment, dict):
+                continue
+            try:
+                total += float(segment.get("AVAILABLE_BALANCE") or 0)
+            except (ValueError, TypeError):
+                continue
+        return total

@@ -69,3 +69,4 @@ finflow_dev.db
 
 # Code analysis cache
 graphify-out/
+finflow_deploy.tar

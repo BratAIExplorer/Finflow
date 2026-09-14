@@ -1,5 +1,70 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🔥 502 Bad Gateway — stale duplicate deploy dir was port-squatting the real one — Sep 14, 2026
+Site was fully down (nginx 502, not a crash) after a merge to `main`. Root
+cause **was not the merge**: `/opt/FinFlow` and `/opt/FinFlow/Finflow` are
+two separate, unrelated `docker-compose` stacks that both bind host ports
+`3001`/`8001`. Server shell history showed a prior session doing manual
+`docker compose down`/`up --build` cycles inside the stale `.../Finflow`
+copy (dated Jul 3, half-`git init`'d, never committed) while debugging
+something unrelated; it was left in the `down` state, and since the real
+`/opt/FinFlow` stack also wasn't running at that moment, nothing held the
+ports and nginx had nothing to proxy to.
+
+**This corrects two earlier entries in this file** (the "second, unused
+nested copy... left in place, harmless" notes below) — it was not harmless,
+it was a live landmine: whoever next ran `docker compose up` in that stale
+directory would silently steal the real app's ports and cause this exact
+outage again.
+
+**Fix**: confirmed `/opt/FinFlow` (not `.../Finflow`) is the fresh,
+currently-deployed one (`backend/main.py` edited today vs. the stale copy's
+July 3 version). Brought `/opt/FinFlow`'s stack up
+(`docker compose up -d --build`) — db/redis/backend/frontend all healthy,
+site verified live. Backed up the stale directory to
+`/root/backups/finflow-stale-Finflow-subdir-20260914-182100.tar.gz`, then
+deleted `/opt/FinFlow/Finflow` for good.
+
+**Still true and still the real fix needed**: `/opt/FinFlow` has no `.git`
+— it's `scp`/`tar`-deployed by hand. Until it's a real `git clone` with
+`git pull && docker compose up -d --build` as the deploy step, this class of
+drift (multiple silently-diverged copies, no way to diff against git) can
+happen again. Recommended, not done yet.
+
+## mStock fund sync fixed end-to-end, token lifetime bumped to 30 days — Sep 14, 2026
+Three real, sequential bugs in `backend/brokers/mstock.py`'s `fetch_funds()`,
+each only visible after fixing the one before it — no guessing skipped:
+1. **401 Unauthorized** on `/openapi/typea/user/fundsummary`. Missing
+   `X-PrivateKey` header — every other authenticated call in the file sends
+   it, this one didn't. See `mstock_api_reference.md` for the documented
+   Type A/B header contract.
+2. **500 crash** after the 401 was fixed. `data.get(...)` on `payload["data"]`
+   assumed a dict; the real response is a **list**. First pass made this
+   fail cleanly (400, with the real payload in `last_sync_error`) instead of
+   guessing at the shape blind.
+3. **Confirmed real shape from that error output**: `data` is a list with
+   one dict per trading segment (`SEG: "CAPITAL"`, possibly others for
+   commodity/F&O), each with its own `AVAILABLE_BALANCE`. Now sums
+   `AVAILABLE_BALANCE` across all segments for total cash. Locked in with
+   `test_mstock_fetch_funds_sums_segments_from_list_response`.
+- **Found along the way**: a pre-existing broken test
+  (`test_mstock_fetch_holdings_parses_and_filters_zero_qty`) — this
+  morning's earlier commit (`ec0aa98`, the 502 Bad Gateway fix) added a
+  `/connect/login` call before `/verifytotp` but never updated this test's
+  mocked response queue, so it silently broke. Fixed the mock, unrelated to
+  the funds bugs. Full suite (33 tests) passes.
+- **`ACCESS_TOKEN_EXPIRE_MINUTES`** wasn't set in the VPS `.env` (fell back
+  to the 7-day default in `docker-compose.yml`). Bumped to `43200`
+  (30 days) directly in `/opt/FinFlow/.env` and restarted the backend
+  container — that file isn't in git, so this is VPS-only until someone
+  updates the documented default too.
+- **Deployed and confirmed live**: `/opt/FinFlow` is `scp` + `docker compose
+  build`-deployed, not git-pulled (a plain container restart does nothing —
+  `backend/` is baked into the image, not volume-mounted). All three fixes
+  committed on `feature/ui-redesign-and-mstock-fixes`
+  (`0c5a96e`, `eb46360`, `89c394f`, `4cfe197`), copied to the VPS, image
+  rebuilt, container recreated each time.
+
 ## 🐛 Regression Fixed: CORS/localhost:8000 on Live Site — Sep 14, 2026
 The VPS redeploy above (theme-engine fix) introduced a real regression:
 merging `main`'s `frontend/Dockerfile` wholesale dropped the
@@ -42,7 +107,9 @@ diverged:
   byte-for-byte (confirmed via diff before touching anything).
 - A second, unused nested copy at `/opt/FinFlow/Finflow/frontend/` (not
   referenced by `docker-compose.yml`'s build context) added to the confusion
-  during investigation — left in place, harmless, but worth cleaning up.
+  during investigation — left in place at the time. **Update: this was not
+  harmless** — see the 502 entry at the top of this file for the outage it
+  caused and the deletion.
 
 **Fix**: merged `main` into `feature/market-board-tab` locally (real 2-parent
 merge — resolved 11 conflicts across `.env.example`, `.gitignore`,
@@ -202,10 +269,104 @@ non-independence of overlapping observations (the same idea as the
   re-priced every fully-graded historical snapshot forever — fixed by
   filtering out rows where `hit_30d` is already set. New tests in
   `backend/tests/test_trend_snapshot.py` cover both.
-- Left alone (found, not yet acted on): `Finflow/Finflow/docker-compose.yml`
-  is a genuinely empty (0 bytes), stale file dated Jul 3 — harmless but
-  confusing for a future session; flagging for deletion rather than
-  deleting without being asked.
+- Left alone (found, not yet acted on) at the time: `Finflow/Finflow/docker-compose.yml`
+  was flagged for deletion rather than deleted without being asked. **Update:
+  it (and the whole stale `/opt/FinFlow/Finflow` directory) caused a real
+  502 outage** — see the entry at the top of this file. Deleted, with a
+  backup taken first.
+
+## 📉 Sixth null result: low-volatility factor — no edge — Sep 14, 2026
+Tested whether buying the lowest-realized-volatility decile of NIFTY 50 beats
+equal-weight buy-and-hold of the same universe (the "low-volatility anomaly").
+Built with the corrected methodology from the start — non-overlapping
+quarterly rebalance periods, benchmark = equal-weight buy-and-hold of the
+same universe (not an assumed 50/50), realistic turnover cost — rather than
+repeating the overlapping-sample mistake documented above.
+
+**Result: low-vol underperformed.** 18 non-overlapping quarters, 5 years,
+48/50 NIFTY 50 symbols (`LTIM`/`TATAMOTORS` failed to fetch — stale
+tickers in `NIFTY_50`, not investigated further):
+
+| Portfolio | Avg return/quarter | Beat benchmark | Sharpe/period |
+|---|---|---|---|
+| Low-vol decile | 2.96% | 38.9% of periods | 0.39 |
+| Benchmark (equal-weight universe) | 3.62% | — | 0.47 |
+| High-vol decile | 4.75% | — | — |
+
+Paired t-stat -0.94 — not distinguishable from noise, and what signal there
+is points the *wrong* way (high-vol did best over this window). Small sample
+(18 periods) — this is "no detectable edge at this power," same caveat as
+every other test in this file, not "high-vol proven better."
+
+**Why Piotroski F-Score was deliberately NOT backtested**: it needs
+fundamentals as they were known at each historical rebalance date.
+`yfinance` only exposes a company's last ~4-5 quarters of financials as they
+stand *today* (restated), not point-in-time snapshots from past years —
+scoring 2022 with 2026's restated numbers is the same look-ahead-bias
+category of mistake as the retracted momentum result above. Rather than
+repeat that mistake, F-Score was built as **`piotroski_screen.py`** — a
+live-only screen (today's fundamentals, today's stocks, for idea generation)
+explicitly labeled as not backtested and not evidence of predictive edge.
+Honest point-in-time fundamentals would need a paid data vendor; out of
+scope until that's decided worth paying for.
+
+- Code: `backend/tools/backtest_lowvol.py` (backtest) and
+  `backend/tools/piotroski_screen.py` (live screen only). Tests: 6 new,
+  offline/synthetic, in `backend/tests/test_backtest_lowvol.py` — caught one
+  real bug during review (`_portfolio_return` crashed with `KeyError` on a
+  benchmark universe member missing from the aligned-closes dict; fixed to
+  skip rather than crash).
+
+## 💡 Ideas explored for where a real edge might still live — Sep 14, 2026
+Prompted by "RSI/MACD/momentum/low-vol are all arbitraged away — what's left
+that a retail trader can actually access?" Data-availability findings from
+checking mStock's and Kite's actual API docs (not assumed):
+
+1. **Options premium selling (IV vs. realized vol)** — the one idea here with
+   real structural backing (implied vol tends to overprice realized vol on
+   average) rather than pattern-mining hope. **Blocked on data**: mStock's
+   Option Chain API is documented but marked "*Coming Soon*" with no IV or
+   Greeks field (just strike/token/OI-count) — needs a live call with a real
+   key to confirm it even returns non-placeholder numbers before building
+   anything. Kite Connect has full historical options data incl. open
+   interest, but requires opening a *second* brokerage account (Zerodha) and
+   a **₹500/month paid plan** — real-time data and historical candles are
+   NOT in Kite's free tier (confirmed from their docs). Decision to make
+   before building: is a second broker account + subscription worth it, or
+   wait until mStock's option chain is confirmed live?
+2. **VWAP / Volume Profile** — ✅ buildable today, free, on mStock's existing
+   Intraday Chart Data endpoint (`[timestamp, O, H, L, C, volume]` per
+   minute). Caveat: that endpoint only returns *today's* candles ("only
+   current date data will be shown") — no historical intraday, so this can
+   only be forward-tested from whenever data capture starts, not
+   backtested on the past. Not yet built.
+3. **True order-flow / buy-vs-sell volume delta** — ❌ not available. mStock
+   gives total volume per candle, not bid-side vs. ask-side tagged trades.
+   Would need tick-level data with trade-direction tagging, which neither
+   mStock nor Kite's documented endpoints expose. Don't pursue.
+4. **Gamma exposure / dealer positioning** — ❌ blocked, same reason as
+   options premium above (no Greeks/OI data confirmed live yet).
+5. **News/PEAD (Post-Earnings-Announcement Drift) and sentiment divergence**
+   — plausible edge family (well-documented anomaly), but blocked on a
+   different kind of missing data: `backend/routers/news.py` is a live,
+   stateless keyword-sentiment tagger (POS/NEG word lists) with **no
+   historical archive** of (headline, forward return) pairs. Needs weeks-to-
+   months of data collection (store today's headlines + realized forward
+   returns going forward) before there's anything to backtest. Cheapest
+   first step of the five: costs nothing to start, but produces no testable
+   result quickly.
+6. **Quality/low-vol factor model** — tested (see section above), null.
+
+**Recommended next step, in order of cheapest-to-learn-something**: (a)
+confirm mStock's option chain returns real data with a live authenticated
+call — 5 minutes, resolves the biggest open question; (b) start archiving
+`news.py` output + forward returns daily, in parallel, since it costs
+nothing and the data-collection clock only starts once begun; (c) build VWAP
+deviation signals on mStock's live intraday feed for forward-paper-testing.
+Do not open a Kite/Zerodha account or start any options-selling
+implementation before (a) is confirmed and until explicit position-sizing/
+tail-risk limits are decided — this is real-money risk, not a backtest
+decision.
 
 ## 🏆 RETRACTED — Strongest finding yet: sector laggards bounce back — Sep 14, 2026
 Continued digging for signals after the Nifty-relative momentum result.
@@ -528,6 +689,9 @@ Live-tested against the deployed VPS, not just read from source:
 
 ## 💡 Ecosystem Note
 The **ARUN Trading Bot** is now a separate standalone project. FinFlow will eventually integrate with it via a read-only database connection to show "Bot Managed" assets in the total net worth view.
+
+**Quantitative Research / Backtesting (Sep 14, 2026):**
+All quantitative research, backtesting scripts, and strategy validation logic (previously in `FinFlow` and `TradingBot`) have been migrated to a centralized repository at `C:\Antigravity\Backtesting`. This serves as the single source of truth for backtesting going forward.
 
 ### Recent Updates (Sep 13, 2026)
 - **UI/UX Refinements**: Enlarged fonts across the Summary panel and made the UI more senior-citizen friendly. Simplified owner name displays (e.g. converting emails to first names).
