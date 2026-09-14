@@ -1,5 +1,29 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 🔑 mStock connector was re-authenticating via TOTP on every single sync — Sep 14, 2026
+Found while tracing the broker-abstraction graph: `MStockConnector` stored its
+daily session token only as an in-memory instance attribute
+(`self._access_token`), never in `UserPlugin.config`. `ZerodhaConnector`
+already did this correctly (`session_state` dict, persisted by the router).
+Since `_make_connector()` builds a fresh connector object per request, mStock's
+"is my session still fresh" check was always `False` — every sync ran a full
+TOTP round-trip, whether or not the token from an hour ago was still valid.
+- **Fixed**: `MStockConnector` now takes `session_state` (same
+  `access_token`/`access_token_date` shape as Zerodha) and
+  [holdings.py](backend/routers/holdings.py)'s `_make_connector()` /
+  `_run_sync()` load and persist it through `UserPlugin.config`, same as
+  Zerodha already did. TOTP now only fires once per day, not once per sync.
+- **Also fixed in passing**: `test_mstock_fetch_holdings_parses_and_filters_zero_qty`
+  was queuing an unused extra fake HTTP response, which shifted the mock
+  response order and made the test fail for the wrong reason — removed it.
+- Test: `test_mstock_skips_totp_when_session_state_is_fresh` in
+  `backend/tests/test_holdings.py` guards the caching behavior — it queues
+  zero login/TOTP responses, so a regression back to always-re-authenticate
+  fails loudly (IndexError) instead of silently.
+- **Not changed**: no DB migration — existing `plugin.config` rows already
+  default to `{}`, so old mStock accounts just re-auth once more on the first
+  sync after deploy, then cache normally like Zerodha does.
+
 ## 🎯 Two follow-up backtests — one real signal found, one didn't hold up — Sep 14, 2026
 Extended `backend/tools/backtest_trend.py` with the two candidates from the
 "how would you improve accuracy" discussion, same 16-symbol/2-year data, same

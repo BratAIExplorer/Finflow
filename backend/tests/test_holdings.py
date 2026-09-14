@@ -146,7 +146,6 @@ class _FakeClient:
 def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
     from backend.brokers import mstock
 
-    login_resp = _FakeResponse({"data": {"ugid": "x"}})
     totp_resp = _FakeResponse({"data": {"access_token": "fake-jwt"}})
     holdings_resp = _FakeResponse({
         "data": [
@@ -154,7 +153,7 @@ def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
             {"tradingsymbol": "SOLDOUT", "exchange": "NSE", "quantity": 0, "averageprice": 50.0},
         ]
     })
-    fake_client = _FakeClient([login_resp, totp_resp, holdings_resp])
+    fake_client = _FakeClient([totp_resp, holdings_resp])
     monkeypatch.setattr(mstock.httpx, "Client", lambda timeout=15: fake_client)
     monkeypatch.setattr(mstock.pyotp, "TOTP", lambda secret: type("T", (), {"now": lambda self: "111111"})())
 
@@ -168,6 +167,26 @@ def test_mstock_fetch_holdings_parses_and_filters_zero_qty(monkeypatch):
         symbol="HDFCBANK", exchange="NSE", quantity=120.0, avg_buy_price=1485.0,
         currency="INR", isin="INE001", first_buy_date=None,
     )
+    # session_state now holds the token — this is what the router persists to
+    # UserPlugin.config so the next sync doesn't re-authenticate via TOTP.
+    assert connector.session_state["access_token"] == "fake-jwt"
+
+
+def test_mstock_skips_totp_when_session_state_is_fresh(monkeypatch):
+    from datetime import datetime
+    from backend.brokers import mstock
+
+    holdings_resp = _FakeResponse({"data": []})
+    fake_client = _FakeClient([holdings_resp])  # only the holdings call — no login/totp call queued
+    monkeypatch.setattr(mstock.httpx, "Client", lambda timeout=15: fake_client)
+
+    connector = mstock.MStockConnector(
+        {"api_key": "k", "username": "u", "password": "p", "totp_secret": "s"},
+        session_state={"access_token": "cached-jwt", "access_token_date": datetime.now().date().isoformat()},
+    )
+    connector.fetch_holdings()  # would raise IndexError popping an empty response queue if it re-authenticated
+
+    assert connector.session_state["access_token"] == "cached-jwt"
 
 
 def test_zerodha_fetch_holdings_requires_session_first():

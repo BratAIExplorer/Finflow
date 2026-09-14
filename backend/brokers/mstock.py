@@ -44,14 +44,21 @@ _TOKEN_FIELD_CANDIDATES = ("access_token", "enctoken", "jwtToken", "token")
 class MStockConnector(BrokerConnector):
     broker_name = "mstock"
 
-    def __init__(self, credentials: dict):
+    def __init__(self, credentials: dict, session_state: Optional[dict] = None):
+        """session_state is UserPlugin.config — where the daily access_token lives,
+        same pattern as ZerodhaConnector. Pass the current value in; after
+        ensure_session() the caller must persist self.session_state back to
+        UserPlugin.config, or this re-authenticates via TOTP on every sync."""
         super().__init__(credentials)
-        self._access_token: Optional[str] = None
-        self._token_date: Optional[date] = None
+        self.session_state = dict(session_state or {})
 
     def _session_is_fresh(self) -> bool:
         # mStock tokens expire at midnight of the day they were issued
-        return self._access_token is not None and self._token_date == datetime.now().date()
+        token = self.session_state.get("access_token")
+        token_date = self.session_state.get("access_token_date")
+        if not token or not token_date:
+            return False
+        return token_date == datetime.now().date().isoformat()
 
     def ensure_session(self) -> None:
         if self._session_is_fresh():
@@ -95,15 +102,17 @@ class MStockConnector(BrokerConnector):
                 f"mStock login succeeded but no recognizable token field in response: {list(data.keys())}"
             )
 
-        self._access_token = token
-        self._token_date = datetime.now().date()
+        self.session_state = {
+            "access_token": token,
+            "access_token_date": datetime.now().date().isoformat(),
+        }
 
     def fetch_holdings(self) -> list[RawHolding]:
         self.ensure_session()
         api_key = self.credentials["api_key"]
         headers = {
             "X-Mirae-Version": "1",
-            "Authorization": f"Bearer {self._access_token}",
+            "Authorization": f"Bearer {self.session_state['access_token']}",
             "X-PrivateKey": api_key,
         }
         try:
@@ -138,7 +147,7 @@ class MStockConnector(BrokerConnector):
         api_key = self.credentials["api_key"]
         headers = {
             "X-Mirae-Version": "1",
-            "Authorization": f"Bearer {self._access_token}",
+            "Authorization": f"Bearer {self.session_state['access_token']}",
             "X-PrivateKey": api_key,
         }
         try:

@@ -24,7 +24,7 @@ SUPPORTED_BROKERS = {"mstock", "zerodha"}
 def _make_connector(plugin: UserPlugin):
     creds = decrypt_credentials(plugin.credentials_encrypted)
     if plugin.plugin_name == "mstock":
-        return MStockConnector(creds)
+        return MStockConnector(creds, session_state=plugin.config or {})
     if plugin.plugin_name == "zerodha":
         return ZerodhaConnector(creds, session_state=plugin.config or {})
     raise HTTPException(status_code=400, detail=f"Unsupported broker: {plugin.plugin_name}")
@@ -144,6 +144,7 @@ def _run_sync(plugin: UserPlugin, connector, db: Session):
             cash = connector.fetch_funds()
             
         new_cfg = dict(plugin.config or {})
+        new_cfg.update(connector.session_state)  # persist the daily token so it isn't re-fetched next sync
         new_cfg["cash_balance"] = cash
         plugin.config = new_cfg
         

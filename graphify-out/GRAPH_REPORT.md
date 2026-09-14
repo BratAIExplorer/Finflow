@@ -1,24 +1,24 @@
-# Graph Report - FinFlow  (2026-09-10)
+# Graph Report - FinFlow  (2026-09-14)
 
 ## Corpus Check
-- 93 files · ~59,160 words
+- 108 files · ~70,340 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1037 nodes · 1298 edges · 72 communities (54 shown, 18 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 57 edges (avg confidence: 0.74)
+- 1175 nodes · 1639 edges · 86 communities (67 shown, 19 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 58 edges (avg confidence: 0.73)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c3c8cd51`
+- Built from commit: `9549a1b6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Finflow/backend/routers/auth.py
-- test_holdings.py
+- RawHolding
 - Python requirements.txt
-- backend/routers/auth.py
+- backend/main.py
 - devDependencies
 - dependencies
 - holdings.py
@@ -71,7 +71,7 @@
 - Finflow/frontend/eslint.config.mjs
 - Finflow/frontend/next.config.ts
 - clsx
-- framer-motion
+- holdingsFormat.ts
 - lucide-react
 - next
 - tailwind-merge
@@ -79,21 +79,33 @@
 - PROJECT.md
 - clsx
 - framer-motion
-- next
+- test_backtest_trend.py
 - recharts
 - tailwind-merge
+- test_trend_snapshot.py
+- backend/routers/auth.py
+- test_holdings.py
+- backend/models.py
+- _FakeClient
+- BrokerConnectionError
+- plain_flags.py
+- news.py
+- Key Integration Details
+- MStockConnector
+- recharts
+- lucide-react
 
 ## God Nodes (most connected - your core abstractions)
-1. `ZerodhaConnector` - 17 edges
-2. `Python requirements.txt` - 17 edges
-3. `compilerOptions` - 16 edges
-4. `BrokerConnectionError` - 16 edges
+1. `BrokerConnectionError` - 17 edges
+2. `ZerodhaConnector` - 17 edges
+3. `Python requirements.txt` - 17 edges
+4. `compilerOptions` - 16 edges
 5. `compilerOptions` - 16 edges
-6. `RawHolding` - 13 edges
-7. `_FakeClient` - 12 edges
-8. `📋 Finflow Documentation Analysis` - 12 edges
-9. `✅ Implementation Checklist - Personal Wealth Hub v2.0` - 12 edges
-10. `MStockConnector` - 11 edges
+6. `MStockConnector` - 14 edges
+7. `backtest_symbol()` - 14 edges
+8. `RawHolding` - 13 edges
+9. `record_snapshot()` - 13 edges
+10. `_FakeClient` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Multi-Currency First UI (always-visible switcher)` --semantically_similar_to--> `Multi-Currency System (MYR/INR/USD/SGD)`  [INFERRED] [semantically similar]
@@ -118,23 +130,23 @@
 - **FinFlow Docker Compose Stack** — docker_compose_db, docker_compose_redis, docker_compose_backend, docker_compose_frontend [EXTRACTED 0.95]
 - **Multi-Currency Conversion Subsystem** — wealth_hub_v2_enhanced_currency_service, wealth_hub_v2_enhanced_currency_rates, wealth_hub_v2_enhanced_exchangerate_api, wealth_hub_v2_enhanced_redis_fx_cache [EXTRACTED 0.95]
 
-## Communities (72 total, 18 thin omitted)
+## Communities (86 total, 19 thin omitted)
 
 ### Community 0 - "Finflow/backend/routers/auth.py"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (43): CurrencyService, create_access_token(), get_password_hash(), timedelta, verify_password(), CurrencyService, get_db(), init_db() (+35 more)
 
-### Community 1 - "test_holdings.py"
-Cohesion: 0.06
-Nodes (35): ABC, BrokerConnectionError, BrokerConnector, Shared contract every broker connector implements. This is the "no-code plugin"…, What a broker connector hands back for one stock position, before any…, Raised for anything that stops a sync: expired session, bad credentials,…, One instance = one broker ACCOUNT (not one broker). Two Zerodha logins are two…, Make sure we have a valid, non-expired session token, refreshing it if the… (+27 more)
+### Community 1 - "RawHolding"
+Cohesion: 0.17
+Nodes (10): ABC, BrokerConnector, Shared contract every broker connector implements. This is the "no-code plugin"…, What a broker connector hands back for one stock position, before any…, One instance = one broker ACCOUNT (not one broker). Two Zerodha logins are two…, Make sure we have a valid, non-expired session token, refreshing it if the…, Return every current stock position. Must call ensure_session() first., RawHolding (+2 more)
 
 ### Community 2 - "Python requirements.txt"
 Cohesion: 0.18
 Nodes (14): JWT Authentication, backend/pricing.py, RSI/MACD/52-week Range Signals, fastapi, httpx, pandas, passlib[bcrypt], pydantic (+6 more)
 
-### Community 3 - "backend/routers/auth.py"
-Cohesion: 0.08
-Nodes (42): create_access_token(), get_password_hash(), timedelta, verify_password(), get_db(), init_db(), on_startup(), get (+34 more)
+### Community 3 - "backend/main.py"
+Cohesion: 0.16
+Nodes (15): get_db(), init_db(), on_startup(), get, on_event, root(), _run_daily_trend_job(), get_shared_access() (+7 more)
 
 ### Community 4 - "devDependencies"
 Cohesion: 0.12
@@ -142,23 +154,23 @@ Nodes (17): devDependencies, eslint, eslint-config-next, tailwindcss, @tailwindc
 
 ### Community 5 - "dependencies"
 Cohesion: 0.13
-Nodes (15): dependencies, class-variance-authority, @hookform/resolvers, lucide-react, react, react-dom, react-hook-form, zod (+7 more)
+Nodes (15): dependencies, class-variance-authority, @hookform/resolvers, next, react, react-dom, react-hook-form, zod (+7 more)
 
 ### Community 6 - "holdings.py"
-Cohesion: 0.11
-Nodes (37): decrypt_credentials(), encrypt_credentials(), _get_fernet(), Encrypts/decrypts broker credentials (API keys, TOTP secrets) before they touch…, dict -> encrypted string, safe to store in a JSON/String column., encrypted string -> dict. Raises cryptography.fernet.InvalidToken if the key is…, classify_trend(), Returns {"label": str, "strength": 1|2, "direction": "up"|"down"|"flat"}. Fixed… (+29 more)
+Cohesion: 0.14
+Nodes (35): decrypt_credentials(), encrypt_credentials(), _get_fernet(), Encrypts/decrypts broker credentials (API keys, TOTP secrets) before they touch…, dict -> encrypted string, safe to store in a JSON/String column., encrypted string -> dict. Raises cryptography.fernet.InvalidToken if the key is…, add_broker_account(), delete_broker_account() (+27 more)
 
 ### Community 7 - "pricing.py"
-Cohesion: 0.15
-Nodes (19): _cap_tier(), CompanyMeta, compute_macd_hist(), compute_rsi(), compute_signals(), fetch_company_meta(), fetch_daily_history(), PriceSignals (+11 more)
+Cohesion: 0.29
+Nodes (9): _cap_tier(), CompanyMeta, fetch_company_meta(), fetch_daily_history(), DataFrame, Free public price data + simple technical signals — deliberately NOT pulled…, Best-effort company classification from Yahoo's .info blob. Yahoo's `.info` is…, Raises ValueError if Yahoo has no data for this symbol (e.g. delisted, or the… (+1 more)
 
 ### Community 8 - "FinFlow Personal Wealth Hub"
 Cohesion: 0.06
 Nodes (39): API Integrations (Binance/LUNO/Kite/IBKR/ExchangeRate), Plugin System, Architecture Security (Fernet, read-only, JWT, HTTPS), Broker Holdings Backend (BrokerConnector, mStock+Zerodha), CONFIRM-BEFORE-LIVE broker caution, Decoupled Multi-Product Architecture, RSI/MACD/52-week Price Signals (Yahoo Finance feed), CURRENT_STATUS.md (Where We Are) (+31 more)
 
 ### Community 9 - "frontend/app/page.tsx"
-Cohesion: 0.05
-Nodes (37): AddAssetForm(), AddAssetFormProps, AssetFormData, assetSchema, TODO: Connect to actual API, Account, AccountForm(), api() (+29 more)
+Cohesion: 0.11
+Nodes (23): Home(), AddAssetForm(), AddAssetFormProps, AssetFormData, assetSchema, TODO: Connect to actual API, Account, AccountForm() (+15 more)
 
 ### Community 10 - "🎨 Personal Wealth Hub - PREMIUM DESIGN MOCKUPS"
 Cohesion: 0.05
@@ -234,7 +246,7 @@ Nodes (17): devDependencies, eslint, eslint-config-next, tailwindcss, @tailwindc
 
 ### Community 34 - "dependencies"
 Cohesion: 0.13
-Nodes (15): dependencies, class-variance-authority, @hookform/resolvers, react, react-dom, react-hook-form, recharts, zod (+7 more)
+Nodes (15): dependencies, class-variance-authority, framer-motion, @hookform/resolvers, react, react-dom, react-hook-form, zod (+7 more)
 
 ### Community 35 - "🏗️ TECHNICAL ARCHITECTURE"
 Cohesion: 0.18
@@ -316,25 +328,69 @@ Nodes (3): Deploy on Vercel, Getting Started, Learn More
 Cohesion: 0.83
 Nodes (3): git(), main(), md_to_html()
 
+### Community 59 - "holdingsFormat.ts"
+Cohesion: 0.07
+Nodes (53): fetchCash(), fetchHoldings(), getToken(), PortfolioPage(), Tab, TABS, LoginModal(), Props (+45 more)
+
+### Community 67 - "test_backtest_trend.py"
+Cohesion: 0.10
+Nodes (38): DataFrame, Offline tests for backend/tools/backtest_trend.py. No network — builds a…, A persistent downtrend sits below its own 200 DMA almost the whole way down —…, ADX has no live counterpart to cross-check against — it's backtest-only (see…, No live pricing.py function to cross-check against, so pin the ADX series…, Every graded row's hit_Nd must only be set when the future bar actually exists…, Regression: numpy.bool_ (vs. Python bool) in an object-dtype DataFrame column…, Guards the exact groupby(...).mean() bug found in live testing: build many rows… (+30 more)
+
+### Community 72 - "test_trend_snapshot.py"
+Cohesion: 0.16
+Nodes (26): grade_pending_snapshots(), Session, Trend-accuracy tracking: record each trend call for every held stock, then…, Build (and add, uncommitted) one TrendSnapshot row from already-computed…, Insert one TrendSnapshot per Holding using today's signals. Returns the count…, For every snapshot with a due, ungraded window, fetch the current price and…, record_snapshot(), snapshot_all_holdings() (+18 more)
+
+### Community 73 - "backend/routers/auth.py"
+Cohesion: 0.16
+Nodes (19): create_access_token(), get_password_hash(), timedelta, verify_password(), User, get_current_user(), login(), BaseModel (+11 more)
+
+### Community 74 - "test_holdings.py"
+Cohesion: 0.13
+Nodes (17): classify_trend(), compute_macd_hist(), compute_rsi(), Series, Returns {"label": str, "strength": 1|2, "direction": "up"|"down"|"flat"}. Fixed…, Offline tests for the broker-holdings feature — no real broker credentials or…, test_below_cost_flag(), test_classify_trend_handles_missing_data() (+9 more)
+
+### Community 75 - "backend/models.py"
+Cohesion: 0.18
+Nodes (15): Debt, Holding, ManualAsset, Base, A single broker-synced stock position, one row per (plugin, symbol). Read-only…, UserPlugin, UserPreferences, AssetCreate (+7 more)
+
+### Community 76 - "_FakeClient"
+Cohesion: 0.15
+Nodes (6): _FakeClient, _FakeResponse, Stands in for httpx.Client — records calls, returns queued fake responses., test_mstock_fetch_holdings_parses_and_filters_zero_qty(), test_zerodha_fetch_holdings_parses_with_valid_session(), Exception
+
+### Community 77 - "BrokerConnectionError"
+Cohesion: 0.27
+Nodes (5): BrokerConnectionError, Raised for anything that stops a sync: expired session, bad credentials,…, session_state is UserPlugin.config — where the daily access_token lives. Pass…, Call this once, right after the person's browser redirects back with…, ZerodhaConnector
+
+### Community 78 - "plain_flags.py"
+Cohesion: 0.33
+Nodes (9): build_flags(), holding_period_flag(), PlainFlag, price_position_flag(), Plain-language, rule-based flags for the dashboard's "What to know" chip —…, test_long_term_flag_over_one_year(), test_near_high_flag(), test_short_term_flag_under_one_year() (+1 more)
+
+### Community 79 - "news.py"
+Cohesion: 0.31
+Nodes (8): _fetch_one(), list_news(), _pub(), get, Session, User, Company news per holding, ported from Deepaks-Bots/news.py (Google News RSS).…, _sentiment()
+
+### Community 80 - "Key Integration Details"
+Cohesion: 0.29
+Nodes (6): Authentication Flow (Type A), Fetching Holdings (Type B), Important Quirks, Key Integration Details, mStock API Reference, Useful Links
+
 ## Knowledge Gaps
-- **497 isolated node(s):** `inter`, `outfit`, `metadata`, `assetSchema`, `AssetFormData` (+492 more)
+- **513 isolated node(s):** `inter`, `outfit`, `metadata`, `assetSchema`, `AssetFormData` (+508 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `CurrencyService` connect `Finflow/backend/routers/auth.py` to `backend/routers/auth.py`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **Why does `ZerodhaConnector` connect `test_holdings.py` to `holdings.py`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Are the 5 inferred relationships involving `ZerodhaConnector` (e.g. with `BrokerConnectionError` and `BrokerConnector`) actually correct?**
-  _`ZerodhaConnector` has 5 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `ZerodhaConnector` connect `BrokerConnectionError` to `RawHolding`, `test_holdings.py`, `_FakeClient`, `holdings.py`?**
+  _High betweenness centrality (0.007) - this node is a cross-community bridge._
 - **Are the 4 inferred relationships involving `BrokerConnectionError` (e.g. with `MStockConnector` and `ZerodhaConnector`) actually correct?**
   _`BrokerConnectionError` has 4 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 5 inferred relationships involving `ZerodhaConnector` (e.g. with `BrokerConnectionError` and `BrokerConnector`) actually correct?**
+  _`ZerodhaConnector` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inter`, `outfit`, `metadata` to the rest of the system?**
-  _497 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _513 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Finflow/backend/routers/auth.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.06516290726817042 - nodes in this community are weakly interconnected._
-- **Should `test_holdings.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.06187202538339503 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06352087114337568 - nodes in this community are weakly interconnected._
+- **Should `devDependencies` be split into smaller, more focused modules?**
+  _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
+- **Should `dependencies` be split into smaller, more focused modules?**
+  _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
