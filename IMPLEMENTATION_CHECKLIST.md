@@ -56,10 +56,20 @@
   - [ ] Home loans/mortgages
   - [ ] Car loans
   - [ ] Payment schedules
-- [ ] Basic Dashboard
-  - [ ] Net worth display
-  - [ ] Asset vs Debt breakdown
-  - [ ] Currency switcher
+- [x] Basic Dashboard
+  - [x] Net worth display
+  - [x] Asset vs Debt breakdown
+  - [x] Currency switcher
+  - [x] Dual Theme Engine (Light Mode ☀️ & Dark Mode 🌙 live toggle)
+  - [x] High-legibility typography scaling (+15-20% boost)
+  - [x] Adaptive glassmorphism UI & interactive charts
+  - [x] Manual asset modal intake
+- [x] Docker & VPS Orchestration
+  - [x] Multi-stage Next.js standalone container (frontend/Dockerfile)
+  - [x] FastAPI Python backend container (Dockerfile)
+  - [x] PostgreSQL & Redis orchestration (docker-compose.yml)
+  - [x] Automated VPS deployment script (deploy.sh)
+  - [x] Production environment template (.env.example)
 
 **Deliverable**: You can manually track all assets/debts in any currency
 

@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Next.js Frontend (Light & Dark UI with glassmorphic cards)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: finflow-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_INTERNAL_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - finflow-network
+
+  # FastAPI Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finflow-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-finflow_user}:${POSTGRES_PASSWORD:-finflow_secure_password}@db:5432/${POSTGRES_DB:-finflow_db}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-finflow_default_production_secret_key_change_me}
+      - EXCHANGERATE_API_KEY=${EXCHANGERATE_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - finflow-network
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: finflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-finflow_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-finflow_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finflow_user} -d ${POSTGRES_DB:-finflow_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finflow-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: finflow-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - finflow-network
+
+volumes:
+  postgres_data:
+    name: finflow_postgres_data
+  redis_data:
+    name: finflow_redis_data
+
+networks:
+  finflow-network:
+    name: finflow-network
+    driver: bridge

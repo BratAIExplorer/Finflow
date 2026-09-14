@@ -33,8 +33,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+!frontend/lib/
 parts/
 sdist/
 var/
@@ -57,6 +58,7 @@ Thumbs.db
 *.gif
 *.zip
 *.tar.gz
+*.csv
 !frontend/public/ # Keep public assets if needed
 Gemini_Generated_Image_*.png
 files.zip
