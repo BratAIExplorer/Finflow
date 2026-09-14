@@ -18,3 +18,4 @@ python-dotenv>=1.0.0
 pyotp>=2.9.0
 yfinance>=0.2.40
 pandas>=2.2.0
+feedparser>=6.0.11

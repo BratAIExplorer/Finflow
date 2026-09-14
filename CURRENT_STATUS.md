@@ -1,5 +1,23 @@
 # FinFlow Current Status (Updated: Sep 14, 2026)
 
+## 📄 Portfolio: modal → full page, + News tab — Sep 14, 2026
+Portfolio was a fullscreen overlay modal opened from the nav (`HoldingsDashboard.tsx`).
+Replaced with a real route:
+- **`frontend/app/portfolio/page.tsx`** — a proper Next.js page at `/portfolio`
+  with Summary / Holdings / News tabs. Redirects to `/` if not logged in.
+  `HoldingsDashboard.tsx` (the old modal) deleted — nothing else referenced it.
+- **News tab**: per-holding headlines via Google News RSS, ported from
+  `C:\Antigravity\Deepaks-Bots\news.py` (material-news keyword tagging +
+  pos/neg/neutral sentiment). New backend route `backend/routers/news.py`
+  (`GET /news/`), registered in `main.py`. Added `feedparser` to
+  `requirements.txt`. Unlike the bot's poller, this is a stateless GET —
+  no `seen.sqlite` dedup, it just returns current top headlines per holding
+  on every call.
+- Verified: TS typecheck clean, backend router imports clean, unauthenticated
+  `/portfolio` redirects to `/`, authenticated page renders all 3 tabs, and
+  the news fetch was confirmed live against the real portfolio's 16 holdings
+  (Google News RSS returned real headlines).
+
 ## 🧓 Senior-friendly Holdings redesign — Sep 14, 2026
 The Holdings tab was a data table pinned to `min-w-[1400px]` — 11 columns,
 guaranteed horizontal scroll on any laptop, small low-contrast secondary

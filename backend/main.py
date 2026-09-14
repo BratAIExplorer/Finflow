@@ -7,7 +7,7 @@ load_dotenv()  # read .env before any module (database, auth, crypto_utils) chec
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from .database import init_db
-from .routers import auth, assets, family, holdings
+from .routers import auth, assets, family, holdings, news
 
 IS_DEV = os.getenv("ENVIRONMENT", "production").lower() == "development"
 ALLOWED_ORIGINS = os.getenv(
@@ -24,6 +24,7 @@ app.include_router(auth.router)
 app.include_router(assets.router)
 app.include_router(family.router)
 app.include_router(holdings.router)
+app.include_router(news.router)
 
 app.add_middleware(
     CORSMiddleware,
