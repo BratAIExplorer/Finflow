@@ -157,6 +157,7 @@ class MStockConnector(BrokerConnector):
         headers = {
             "X-Mirae-Version": "1",
             "Authorization": f"token {api_key}:{self.session_state['access_token']}",
+            "X-PrivateKey": api_key,
         }
         try:
             with httpx.Client(timeout=15) as client:
